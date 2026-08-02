@@ -1,6 +1,15 @@
 import { isObject } from '../../../shared/is-object.ts'
 import type { JsonObject } from '../../../shared/types.ts'
 
+const ESC = String.fromCodePoint(0x1B)
+const C1_CSI = String.fromCodePoint(0x9B)
+const SGR_SEQUENCE = new RegExp(`(?:${ESC}\\[|${C1_CSI})[0-?]*[ -/]*m`, 'g')
+
+/** Removes terminal SGR styling only from assistant reasoning rendered by the browser. */
+export function reasoningTextForDisplay(role: unknown, text: string): string {
+  return role === 'assistant' ? text.replace(SGR_SEQUENCE, '') : text
+}
+
 /** Accepts only protocol messages whose role and content have a visible thread representation. */
 export function isVisibleConversationMessage(message: JsonObject): boolean {
   const role = message.role

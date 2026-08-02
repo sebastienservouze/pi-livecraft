@@ -3,7 +3,7 @@ import type { JsonObject } from '../../../shared/types.ts'
 import { isObject } from '../../../shared/is-object.ts'
 import { CopyButton } from './CopyButton.tsx'
 import { Markdown } from './Markdown.tsx'
-import { hasVisibleContent } from './message-display.ts'
+import { hasVisibleContent, reasoningTextForDisplay } from './message-display.ts'
 import { formatTokens, formatTurnCost, type MessageUsage } from './message-usage.ts'
 
 /** Renders a visible protocol message with the default or custom presentation. */
@@ -38,7 +38,9 @@ const DefaultMessageCard = memo(
             <CopyButton label='Copy message' onError={onError} value={text} />
           </div>
         )}
-        <div className='content'>{renderContent(message.content ?? message.output)}</div>
+        <div className='content'>
+          {renderContent(message.content ?? message.output, message.role)}
+        </div>
         {role === 'user' && time && (
           <time
             className='message-time'
@@ -55,7 +57,7 @@ const DefaultMessageCard = memo(
 /** Renders an unknown custom message without interpreting extension-specific details. */
 function DefaultCustomMessage({ message }: { message: JsonObject & { customType?: unknown } }) {
   const content = hasVisibleContent(message.content)
-    ? renderContent(message.content)
+    ? renderContent(message.content, message.role)
     : <p>Message has no displayable content.</p>
   return (
     <article className='message custom-message'>
@@ -105,8 +107,8 @@ function visibleText(content: unknown): string {
     .join('')
 }
 
-/** Renders assistant content in order, including visible thinking. */
-function renderContent(content: unknown): ReactNode {
+/** Renders message content in protocol order, including visible thinking. */
+function renderContent(content: unknown, role: unknown): ReactNode {
   if (typeof content === 'string') return <Markdown>{content}</Markdown>
   if (!Array.isArray(content)) return null
   return (
@@ -123,7 +125,11 @@ function renderContent(content: unknown): ReactNode {
           )
         if (!isObject(part)) return null
         if (part.type === 'thinking' && typeof part.thinking === 'string' && part.thinking.trim())
-          return <ReasoningBlock key={`reasoning-${contentIndex}`}>{part.thinking}</ReasoningBlock>
+          return (
+            <ReasoningBlock key={`reasoning-${contentIndex}`}>
+              {reasoningTextForDisplay(role, part.thinking)}
+            </ReasoningBlock>
+          )
         if (part.type === 'text' && typeof part.text === 'string')
           return <Markdown key={`text-${contentIndex}`}>{part.text}</Markdown>
         return null

@@ -76,6 +76,12 @@ async function listSessionFiles(directory: string): Promise<string[]> {
 
 /** Extracts a session's identity, name, and latest activity without loading its full history. */
 async function readPiSession(path: string, updatedAt: number): Promise<RecentSession | null> {
+  let canonicalPath: string
+  try {
+    canonicalPath = await realpath(path)
+  } catch {
+    return null
+  }
   let lines: string[]
   try {
     lines = (await readFile(path, 'utf8')).split('\n')
@@ -85,6 +91,12 @@ async function readPiSession(path: string, updatedAt: number): Promise<RecentSes
 
   const header = parseHeader(lines[0])
   if (!header) return null
+  let cwd: string
+  try {
+    cwd = await realpath(header.cwd)
+  } catch {
+    return null
+  }
   let hasMessage = false
   let name: string | undefined
   let prompt: string | undefined
@@ -112,9 +124,9 @@ async function readPiSession(path: string, updatedAt: number): Promise<RecentSes
   const createdAt = Date.parse(header.timestamp)
   return {
     id: header.id,
-    cwd: header.cwd,
+    cwd,
     name: name || prompt || 'New session',
-    sessionPath: path,
+    sessionPath: canonicalPath,
     updatedAt: lastMessageAt ?? (Number.isNaN(createdAt) ? updatedAt : createdAt),
   }
 }

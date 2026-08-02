@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { pathFromRepositoryRoot } from '../src/features/conversation/tool-call-presentations/shared.ts'
 import {
   editDiffDisplayLines,
   fileUrl,
@@ -14,6 +15,24 @@ import {
   toolTextPreview,
   truncateToolText,
 } from '../src/features/conversation/tool-presentation.ts'
+
+test('makes only matching Windows drive and UNC paths repository-relative', () => {
+  assert.equal(pathFromRepositoryRoot('C:\\Repo\\Src\\file.ts', 'C:/Repo'), 'Src/file.ts')
+  assert.equal(
+    pathFromRepositoryRoot('\\\\server\\share\\repo\\src\\file.ts', '\\\\server\\share\\repo'),
+    'src/file.ts',
+  )
+  assert.equal(
+    pathFromRepositoryRoot('C:\\Repo\\file.ts', 'C:\\repo'),
+    'C:\\Repo\\file.ts',
+  )
+  assert.equal(
+    pathFromRepositoryRoot('\\\\SERVER\\share\\repo\\file.ts', '\\\\server\\share\\repo'),
+    '\\\\SERVER\\share\\repo\\file.ts',
+  )
+  assert.equal(pathFromRepositoryRoot('D:\\repo\\file.ts', 'C:\\repo'), 'D:\\repo\\file.ts')
+  assert.equal(pathFromRepositoryRoot('/Repo/file.ts', '/repo'), '/Repo/file.ts')
+})
 
 test('extracts valid edit replacements without accepting malformed entries', () => {
   assert.deepEqual(

@@ -1,6 +1,5 @@
 import { createReadStream } from 'node:fs'
 import { readdir, realpath, stat } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { dirname, extname, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -32,6 +31,7 @@ import {
 import { activeSessionMessages, LiveSessionEvents } from './session-snapshot.ts'
 import { loadPromptTemplates, savePromptTemplate } from './prompt-templates.ts'
 import { externalWorkspacePath, openPath } from './system-integration.ts'
+import { expandHomePath } from './home-path.ts'
 import type {
   DirectoryListing,
   JsonObject,
@@ -481,11 +481,7 @@ function arrayData(response: JsonObject, key: string): JsonObject[] {
 async function resolveWorkingDirectory(input: string): Promise<string> {
   const trimmed = input.trim()
   if (!trimmed) throw new HttpError(400, 'Working directory is required')
-  const expanded = trimmed === '~'
-    ? homedir()
-    : trimmed.startsWith('~/')
-    ? resolve(homedir(), trimmed.slice(2))
-    : trimmed
+  const expanded = expandHomePath(trimmed)
   let canonical: string
   try {
     canonical = await realpath(expanded)

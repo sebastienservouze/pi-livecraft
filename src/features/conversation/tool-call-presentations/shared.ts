@@ -35,6 +35,17 @@ export function pathFromRepositoryRoot(path: string, repositoryRoot?: string | n
   if (!repositoryRoot) return path
 
   const root = repositoryRoot.replace(/\/+$/, '')
+  if (isWindowsAbsolute(path) && isWindowsAbsolute(root)) {
+    const normalizedPath = path.replace(/\\/g, '/')
+    const normalizedRoot = root.replace(/\\/g, '/').replace(/\/+$/, '')
+    if (normalizedPath === normalizedRoot) return '.'
+    if (!normalizedPath.startsWith(`${normalizedRoot}/`)) return path
+    return normalizedPath.slice(normalizedRoot.length + 1)
+  }
   if (path === root) return '.'
   return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path
+}
+
+function isWindowsAbsolute(path: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(path) || /^\\\\[^\\/]+[\\/][^\\/]+(?:[\\/]|$)/.test(path)
 }

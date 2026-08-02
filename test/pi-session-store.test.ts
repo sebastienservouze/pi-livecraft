@@ -1,17 +1,24 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import test from 'node:test'
 import { listRecentPiSessions } from '../server/pi-session-store.ts'
 
-test('sorts Pi sessions by their last message timestamp', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'pi-sessions-'))
+async function fixture(): Promise<{ directory: string; workspace: string }> {
+  return {
+    directory: await mkdtemp(join(tmpdir(), 'pi-sessions-')),
+    workspace: await mkdtemp(join(tmpdir(), 'pi-workspace-')),
+  }
+}
+
+test('sorts canonical Pi sessions by their last message timestamp', async () => {
+  const { directory, workspace } = await fixture()
   const sessions = join(directory, 'project')
   await mkdir(sessions)
   await writeSession(
     join(sessions, 'older.jsonl'),
-    '/workspace',
+    `${workspace}${sep}`,
     'older',
     'Older session',
     undefined,
@@ -19,89 +26,74 @@ test('sorts Pi sessions by their last message timestamp', async () => {
   )
   await writeSession(
     join(sessions, 'newer.jsonl'),
-    '/workspace',
+    workspace,
     'newer',
     'Newer session',
     'Renamed session',
   )
-  await writeSession(join(sessions, 'other.jsonl'), '/another-workspace', 'other', 'Other session')
-
-  const recent = await listRecentPiSessions('/workspace', directory)
-
-  assert.deepEqual(recent.map(({ id, name }) => ({ id, name })), [
-    { id: 'older', name: 'Older session' },
-    { id: 'newer', name: 'Renamed session' },
+  const recent = await listRecentPiSessions(workspace, directory)
+  assert.deepEqual(recent.map(({ id, name, cwd }) => ({ id, name, cwd })), [
+    { id: 'older', name: 'Older session', cwd: workspace },
+    { id: 'newer', name: 'Renamed session', cwd: workspace },
+  ])
+  assert.deepEqual(recent.map(({ sessionPath }) => sessionPath), [
+    await realpath(join(sessions, 'older.jsonl')),
+    await realpath(join(sessions, 'newer.jsonl')),
   ])
 })
 
-test('returns every session in the working directory', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'pi-sessions-'))
+test('returns every session in the canonical working directory and omits stale cwd records', async () => {
+  const { directory, workspace } = await fixture()
   await Promise.all(
     Array.from({ length: 11 }, (_, index) =>
       writeSession(
         join(directory, `${index}.jsonl`),
-        '/workspace',
+        workspace,
         String(index),
         `Session ${index}`,
       )),
   )
-
-  const recent = await listRecentPiSessions('/workspace', directory)
-
-  assert.equal(recent.length, 11)
+  await writeSession(join(directory, 'stale.jsonl'), join(directory, 'missing'), 'stale', 'Stale')
+  assert.equal((await listRecentPiSessions(workspace, directory)).length, 11)
 })
 
-test('uses the first non-command user prompt when a session has no name', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'pi-sessions-'))
-  const path = join(directory, 'unnamed.jsonl')
+test('uses the first non-command user prompt and hides sessions without messages', async () => {
+  const { directory, workspace } = await fixture()
   await writeFile(
-    path,
+    join(directory, 'unnamed.jsonl'),
     [
       JSON.stringify({
         type: 'session',
         version: 3,
         id: 'unnamed',
         timestamp: '2026-07-19T10:00:00.000Z',
-        cwd: '/workspace',
+        cwd: workspace,
       }),
       JSON.stringify({ type: 'message', message: { role: 'user', content: '/agent' } }),
       JSON.stringify({
         type: 'message',
-        message: {
-          role: 'user',
-          content: [{ type: 'text', text: 'One two three four five six seven eight nine' }],
-        },
+        message: { role: 'user', content: 'One two three four five six seven eight nine' },
       }),
     ]
       .join('\n'),
   )
-
-  const [recent] = await listRecentPiSessions('/workspace', directory)
-
-  assert.equal(recent.name, 'One two three four five six seven eight…')
-})
-
-test('hides a session until it contains a message', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'pi-sessions-'))
-  const path = join(directory, 'unnamed.jsonl')
   await writeFile(
-    path,
+    join(directory, 'empty.jsonl'),
     [
       JSON.stringify({
         type: 'session',
         version: 3,
-        id: 'unnamed',
+        id: 'empty',
         timestamp: '2026-07-19T10:00:00.000Z',
-        cwd: '/workspace',
+        cwd: workspace,
       }),
       JSON.stringify({ type: 'session_info', name: 'New session' }),
     ]
       .join('\n'),
   )
-
-  const recent = await listRecentPiSessions('/workspace', directory)
-
-  assert.deepEqual(recent, [])
+  const recent = await listRecentPiSessions(workspace, directory)
+  assert.equal(recent.length, 1)
+  assert.equal(recent[0].name, 'One two three four five six seven eight…')
 })
 
 async function writeSession(
@@ -113,7 +105,6 @@ async function writeSession(
   lastMessageTimestamp?: string,
 ): Promise<void> {
   const timestamp = id === 'newer' ? '2026-07-19T10:00:00.000Z' : '2026-07-19T09:00:00.000Z'
-  const messageTimestamp = lastMessageTimestamp ?? timestamp
   await writeFile(
     path,
     [
@@ -121,7 +112,7 @@ async function writeSession(
       JSON.stringify({ type: 'session_info', name }),
       JSON.stringify({
         type: 'message',
-        timestamp: messageTimestamp,
+        timestamp: lastMessageTimestamp ?? timestamp,
         message: { role: 'user', content: name },
       }),
       ...(renamedName ? [JSON.stringify({ type: 'session_info', name: renamedName })] : []),

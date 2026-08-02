@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import test from 'node:test'
-import { listRecentPiSessions } from '../server/pi-session-store.ts'
+import { listRecentPiSessions, resolvePiSessionDirectory } from '../server/pi-session-store.ts'
 
 async function fixture(): Promise<{ directory: string; workspace: string }> {
   return {
@@ -11,6 +11,28 @@ async function fixture(): Promise<{ directory: string; workspace: string }> {
     workspace: await mkdtemp(join(tmpdir(), 'pi-workspace-')),
   }
 }
+
+test('resolves Pi session storage with Pi environment precedence', () => {
+  const homeDirectory = join('home', 'user')
+  const agentDirectory = join('infrastructure', '.pi', 'agent')
+  const sessionDirectory = join('custom', 'sessions')
+
+  assert.equal(
+    resolvePiSessionDirectory({
+      PI_CODING_AGENT_SESSION_DIR: sessionDirectory,
+      PI_CODING_AGENT_DIR: agentDirectory,
+    }, homeDirectory),
+    sessionDirectory,
+  )
+  assert.equal(
+    resolvePiSessionDirectory({ PI_CODING_AGENT_DIR: agentDirectory }, homeDirectory),
+    join(agentDirectory, 'sessions'),
+  )
+  assert.equal(
+    resolvePiSessionDirectory({}, homeDirectory),
+    join(homeDirectory, '.pi', 'agent', 'sessions'),
+  )
+})
 
 test('sorts canonical Pi sessions by their last message timestamp', async () => {
   const { directory, workspace } = await fixture()

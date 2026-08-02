@@ -26,7 +26,7 @@ import type {
 } from '../shared/types.ts'
 
 const host = '127.0.0.1'
-const port = readPort('PI_LIVECRAFT_MANAGER_PORT', 43_120)
+const port = readPort('PI_LIVECRAFT_MANAGER_PORT', 31_020)
 const clients = new Set<Socket>()
 const sessions = new Map<string, ManagedSession>()
 const restartExitCode = readRestartExitCode()

@@ -208,7 +208,7 @@ When these extensions are installed and configured in Pi, Livecraft already cont
 <summary><strong>Troubleshooting</strong></summary>
 
 - `pi: command not found`: install Pi globally and verify that `pi --version` works in the shell used to start Livecraft.
-- The manager or backend is unavailable: check ports `43120` and `43121`, or set `PI_LIVECRAFT_MANAGER_PORT` and `PI_LIVECRAFT_BACKEND_PORT`. After a manager crash, restart `npm run dev`; the supervisor intentionally does not relaunch it automatically.
+- The manager or backend is unavailable: check ports `31020` and `31021`, or set `PI_LIVECRAFT_MANAGER_PORT` and `PI_LIVECRAFT_BACKEND_PORT`. These local TCP defaults avoid the Windows/WSL dynamic ranges commonly reserved by HNS. After a manager crash, restart `npm run dev`; the supervisor intentionally does not relaunch it automatically.
 - A new session cannot answer: launch Pi once, configure a provider with `/login`, and verify that the `/agent` extension is available if your setup expects it.
 - Linux desktop actions unavailable: install or expose `xdg-open` and `x-terminal-emulator` in `PATH`.
 - WSL desktop actions unavailable: verify that `explorer.exe`, `wslpath`, and `wt.exe` are available in the WSL `PATH`.

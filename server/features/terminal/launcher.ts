@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
 import {
   getDesktopPlatform,
   getWslDistributionName,
@@ -6,6 +6,11 @@ import {
 } from '../../system-integration.ts'
 
 const maxTemplateLength = 2000
+type SpawnProcess = (
+  command: string,
+  args: string[],
+  options: Parameters<typeof spawn>[2],
+) => ChildProcess
 
 export class TerminalTemplateError extends Error {
   constructor(message: string) {
@@ -15,49 +20,68 @@ export class TerminalTemplateError extends Error {
 }
 
 /**
- * Tokenizes a command template respecting double-quote grouping and backslash escapes.
- * Spaces outside quotes separate tokens; quotes are removed from the result.
+ * Tokenizes a command template without shell parsing. Windows path backslashes stay
+ * literal; the legacy backslash-escaped quote form remains valid inside quoted text.
+ * Outside quotes, backslashes escape only whitespace and a quote.
  */
 export function tokenizeTemplate(template: string): string[] {
   const tokens: string[] = []
   let current = ''
   let inQuote = false
+  let tokenStarted = false
 
-  for (let i = 0; i < template.length; i += 1) {
-    const ch = template[i]
-
-    if (ch === '\\' && i + 1 < template.length) {
-      current += template[i + 1]
-      i += 1
-      continue
-    }
-
-    if (ch === '"') {
-      inQuote = !inQuote
-      continue
-    }
-
-    if (ch === ' ' && !inQuote) {
-      if (current.length > 0) {
-        tokens.push(current)
-        current = ''
+  for (let index = 0; index < template.length; index += 1) {
+    const ch = template[index]
+    if (inQuote) {
+      if (
+        ch === '\\' && template[index + 1] === '"'
+        && index + 2 < template.length && !/\s/.test(template[index + 2])
+      ) {
+        current += '"'
+        tokenStarted = true
+        index += 1
+      } else if (ch === '"' && template[index + 1] === '"') {
+        current += '"'
+        tokenStarted = true
+        index += 1
+      } else if (ch === '"') {
+        inQuote = false
+        tokenStarted = true
+      } else {
+        current += ch
+        tokenStarted = true
       }
       continue
     }
 
-    current += ch
+    if (ch === '"') {
+      inQuote = true
+      tokenStarted = true
+    } else if (/\s/.test(ch)) {
+      if (tokenStarted) {
+        tokens.push(current)
+        current = ''
+        tokenStarted = false
+      }
+    } else if (
+      ch === '\\' && index + 1 < template.length
+      && (/\s/.test(template[index + 1]) || template[index + 1] === '"')
+    ) {
+      current += template[index + 1]
+      tokenStarted = true
+      index += 1
+    } else {
+      current += ch
+      tokenStarted = true
+    }
   }
 
   if (inQuote) throw new TerminalTemplateError('Unclosed double quote in terminal command')
-  if (current.length > 0) tokens.push(current)
-
+  if (tokenStarted) tokens.push(current)
   return tokens
 }
 
-/**
- * Parses and validates a terminal command template.
- * Replaces every `{cwd}` placeholder with the resolved workspace path.
- */
+/** Parses and validates a terminal command template before substituting the cwd data. */
 export function parseTerminalTemplate(
   raw: string,
   cwd: string,
@@ -70,25 +94,39 @@ export function parseTerminalTemplate(
 
   const tokens = tokenizeTemplate(raw.trim())
   if (tokens.length === 0) throw new TerminalTemplateError('Terminal command produced no tokens')
-
   if (!raw.includes('{cwd}')) throw new TerminalTemplateError('Terminal command must contain {cwd}')
 
-  const replaced = tokens.map((t) => t.replace(/\{cwd\}/g, cwd))
-  const [command, ...args] = replaced
+  const [command, ...args] = tokens.map((token) => token.replace(/\{cwd\}/g, cwd))
   if (!command) throw new TerminalTemplateError('Terminal command has no executable')
-
   return { command, args }
 }
 
-/** Returns the platform-specific terminal invocation used when no custom template is set. */
+export interface TerminalInvocation {
+  command: string
+  args: string[]
+  cwd?: string
+  env?: NodeJS.ProcessEnv
+  waitForExit?: boolean
+  windowsHide?: boolean
+}
+
+/** Returns the first platform-specific default; Windows launch attempts may fall back further. */
 export function defaultTerminalInvocation(
   workspacePath: string,
   platform = getDesktopPlatform(),
   env: NodeJS.ProcessEnv = process.env,
-): { command: string; args: string[]; cwd?: string } {
+): TerminalInvocation {
+  return defaultTerminalInvocations(workspacePath, platform, env)[0]
+}
+
+function defaultTerminalInvocations(
+  workspacePath: string,
+  platform: DesktopPlatform,
+  env: NodeJS.ProcessEnv,
+): TerminalInvocation[] {
   const wslDistribution = getWslDistributionName(env)
-  return platform === 'wsl'
-    ? {
+  if (platform === 'wsl') {
+    return [{
       command: 'wt.exe',
       args: [
         'nt',
@@ -98,36 +136,87 @@ export function defaultTerminalInvocation(
         '--cd',
         workspacePath,
       ],
-    }
-    : { command: 'x-terminal-emulator', args: [], cwd: workspacePath }
+    }]
+  }
+  if (platform === 'linux')
+    return [{ command: 'x-terminal-emulator', args: [], cwd: workspacePath }]
+  return [
+    { command: 'wt.exe', args: ['--window', 'new', '--startingDirectory', workspacePath] },
+    { command: 'alacritty.exe', args: ['--working-directory', workspacePath] },
+    { command: 'wezterm.exe', args: ['start', '--cwd', workspacePath] },
+    windowsShellBroker('pwsh.exe', '-NoExit', workspacePath),
+    windowsShellBroker('powershell.exe', '-NoExit', workspacePath),
+    windowsShellBroker('cmd.exe', '/d', workspacePath),
+  ]
+}
+
+function windowsShellBroker(shell: string, shellArgs: string, cwd: string): TerminalInvocation {
+  return {
+    command: 'powershell.exe',
+    args: [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      '$ErrorActionPreference = "Stop"; Start-Process -FilePath $env:PI_LIVECRAFT_TERMINAL_SHELL -ArgumentList $env:PI_LIVECRAFT_TERMINAL_ARGS -WorkingDirectory $env:PI_LIVECRAFT_TERMINAL_CWD',
+    ],
+    env: {
+      ...process.env,
+      PI_LIVECRAFT_TERMINAL_ARGS: shellArgs,
+      PI_LIVECRAFT_TERMINAL_SHELL: shell,
+      PI_LIVECRAFT_TERMINAL_CWD: cwd,
+    },
+    waitForExit: true,
+    windowsHide: true,
+  }
 }
 
 /**
- * Launches a terminal application detached from the backend process.
- * An empty template selects the platform default; custom templates still require `{cwd}`.
+ * Launches a terminal detached from the backend. Only the empty default template
+ * tries the next Windows candidate; a user template has exactly one invocation.
  */
-export function openTerminalApplication(
+export async function openTerminalApplication(
   workspacePath: string,
   template?: string | null,
-  platform?: DesktopPlatform,
+  platform: DesktopPlatform = getDesktopPlatform(),
+  spawnProcess: SpawnProcess = spawn,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let invocation: { command: string; args: string[]; cwd?: string }
-    try {
-      invocation = template && template.trim()
-        ? { ...parseTerminalTemplate(template, workspacePath) }
-        : defaultTerminalInvocation(workspacePath, platform ?? getDesktopPlatform())
-    } catch (error) {
-      reject(error)
-      return
-    }
+  if (template && template.trim()) {
+    const invocation = parseTerminalTemplate(template, workspacePath)
+    await spawnDetached(invocation, spawnProcess)
+    return
+  }
 
-    const child = spawn(invocation.command, invocation.args, {
+  const candidates = defaultTerminalInvocations(workspacePath, platform, process.env)
+  let lastError: unknown
+  for (const invocation of candidates) {
+    try {
+      await spawnDetached(invocation, spawnProcess)
+      return
+    } catch (error) {
+      lastError = error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('No terminal application is available')
+}
+
+function spawnDetached(invocation: TerminalInvocation, spawnProcess: SpawnProcess): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawnProcess(invocation.command, invocation.args, {
       cwd: invocation.cwd,
-      detached: true,
+      env: invocation.env,
+      detached: !invocation.waitForExit,
       stdio: 'ignore',
+      shell: false,
+      windowsHide: invocation.windowsHide ?? false,
     })
     child.once('error', reject)
+    if (invocation.waitForExit) {
+      child.once('exit', (code) => {
+        if (code === 0) resolve()
+        else reject(new Error(`${invocation.command} exited with code ${code ?? 'unknown'}`))
+      })
+      return
+    }
     child.once('spawn', () => {
       child.unref()
       resolve()

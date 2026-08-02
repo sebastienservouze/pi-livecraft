@@ -1,12 +1,20 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { stat } from 'node:fs/promises'
 
-export type DesktopPlatform = 'linux' | 'wsl'
+export type DesktopPlatform = 'linux' | 'wsl' | 'windows'
+type SpawnProcess = (
+  command: string,
+  args: string[],
+  options: Parameters<typeof spawn>[2],
+) => ChildProcess
+type StatPath = (path: string) => Promise<{ isDirectory(): boolean }>
 
-/** Identifies the supported Linux desktop environment from the process platform and WSL markers. */
+/** Identifies the supported desktop environment from the process platform and WSL markers. */
 export function getDesktopPlatform(
   platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): DesktopPlatform {
+  if (platform === 'win32') return 'windows'
   if (platform !== 'linux') throw new Error(`Unsupported platform: ${platform}`)
   return env.WSL_DISTRO_NAME || env.WSL_INTEROP ? 'wsl' : 'linux'
 }
@@ -16,13 +24,21 @@ export function getWslDistributionName(env: NodeJS.ProcessEnv = process.env): st
   return env.WSL_DISTRO_NAME || undefined
 }
 
-/** Opens a file or directory with its default application in the current Linux environment. */
+/** Opens a file or directory with its default application in the current desktop environment. */
 export async function openPath(
   path: string,
   platform = getDesktopPlatform(),
+  spawnProcess: SpawnProcess = spawn,
+  statPath: StatPath = stat,
 ): Promise<void> {
+  if (platform === 'windows') {
+    const pathInfo = await statPath(path)
+    if (pathInfo.isDirectory()) await openApplication('explorer.exe', path, spawnProcess)
+    else await invokeWindowsPath(path, spawnProcess)
+    return
+  }
   const command = platform === 'wsl' ? 'explorer.exe' : 'xdg-open'
-  await openApplication(command, await externalWorkspacePath(path, platform))
+  await openApplication(command, await externalWorkspacePath(path, platform), spawnProcess)
 }
 
 /** Returns the path format expected by the browser or desktop integration. */
@@ -55,10 +71,41 @@ function convertWslPath(workspacePath: string): Promise<string> {
   })
 }
 
-/** Detaches a desktop application so restarting the backend never closes it. */
-function openApplication(command: string, path: string): Promise<void> {
+/** Uses a constant script; the untrusted path is passed only as an environment value. */
+function invokeWindowsPath(path: string, spawnProcess: SpawnProcess): Promise<void> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, [path], { detached: true, stdio: 'ignore' })
+    const child = spawnProcess(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        '$ErrorActionPreference = "Stop"; Start-Process -FilePath $env:PI_LIVECRAFT_OPEN_PATH -WindowStyle Normal',
+      ],
+      {
+        env: { ...process.env, PI_LIVECRAFT_OPEN_PATH: path },
+        shell: false,
+        windowsHide: true,
+        stdio: 'ignore',
+      },
+    )
+    child.once('error', reject)
+    child.once('exit', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`Windows path opener exited with code ${code ?? 'unknown'}`))
+    })
+  })
+}
+
+/** Detaches a desktop application so restarting the backend never closes it. */
+function openApplication(command: string, path: string, spawnProcess: SpawnProcess): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawnProcess(command, [path], {
+      detached: true,
+      stdio: 'ignore',
+      shell: false,
+      windowsHide: false,
+    })
     child.once('error', reject)
     child.once('spawn', () => {
       child.unref()

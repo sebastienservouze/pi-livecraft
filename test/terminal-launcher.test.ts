@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
+import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import {
   defaultTerminalInvocation,
   parseTerminalTemplate,
   tokenizeTemplate,
   TerminalTemplateError,
+  openTerminalApplication,
 } from '../server/features/terminal/launcher.ts'
 
 test('tokenizes a simple command', () => {
@@ -15,8 +17,14 @@ test('strips double quotes around a token', () => {
   assert.deepEqual(tokenizeTemplate('cmd "arg with spaces"'), ['cmd', 'arg with spaces'])
 })
 
-test('handles backslash escapes', () => {
+test('handles escaped whitespace while retaining Windows backslashes', () => {
   assert.deepEqual(tokenizeTemplate('cmd arg\\ with\\ spaces'), ['cmd', 'arg with spaces'])
+  assert.deepEqual(tokenizeTemplate('"C:\\Program Files\\Tool.exe" "\\\\server\\share\\"'), [
+    'C:\\Program Files\\Tool.exe',
+    '\\\\server\\share\\',
+  ])
+  assert.deepEqual(tokenizeTemplate('cmd "a""b" C:\\trailing\\'), ['cmd', 'a"b', 'C:\\trailing\\'])
+  assert.deepEqual(tokenizeTemplate(String.raw`cmd "a\"b" {cwd}`), ['cmd', 'a"b', '{cwd}'])
 })
 
 test('collapses multiple spaces outside quotes', () => {
@@ -46,6 +54,81 @@ test('uses the platform terminal defaults', () => {
       args: ['nt', '--', 'wsl.exe', '-d', 'Ubuntu-22.04', '--cd', '/home/user'],
     },
   )
+})
+
+test('uses Windows Terminal in a new native Windows window', () => {
+  assert.deepEqual(defaultTerminalInvocation('C:\\hostile & ü', 'windows'), {
+    command: 'wt.exe',
+    args: ['--window', 'new', '--startingDirectory', 'C:\\hostile & ü'],
+  })
+})
+
+test('tries the next visible native Windows default only when the previous spawn fails', async () => {
+  const calls: Array<{ command: string; windowsHide?: boolean }> = []
+  await openTerminalApplication(
+    'C:\\hostile & ü',
+    undefined,
+    'windows',
+    ((command: string, _args: string[], options: { windowsHide?: boolean }) => {
+      calls.push({ command, windowsHide: options.windowsHide })
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => undefined
+      queueMicrotask(() => child.emit(calls.length === 1 ? 'error' : 'spawn', new Error('missing')))
+      return child as never
+    }) as never,
+  )
+  assert.deepEqual(calls, [
+    { command: 'wt.exe', windowsHide: false },
+    { command: 'alacritty.exe', windowsHide: false },
+  ])
+})
+
+test('launches custom terminal commands visibly', async () => {
+  let windowsHide: boolean | undefined
+  await openTerminalApplication(
+    'C:\\workspace',
+    'custom-terminal --cwd {cwd}',
+    'windows',
+    ((_command: string, _args: string[], options: { windowsHide?: boolean }) => {
+      windowsHide = options.windowsHide
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => undefined
+      queueMicrotask(() => child.emit('spawn'))
+      return child as never
+    }) as never,
+  )
+  assert.equal(windowsHide, false)
+})
+
+test('hides brokered shells, waits for them, and continues after a broker failure', async () => {
+  const calls: Array<{ command: string; windowsHide?: boolean }> = []
+  await openTerminalApplication(
+    'C:\\hostile & ü',
+    undefined,
+    'windows',
+    ((
+      command: string,
+      _args: string[],
+      options: { env?: NodeJS.ProcessEnv; windowsHide?: boolean },
+    ) => {
+      const target = options.env?.PI_LIVECRAFT_TERMINAL_SHELL
+      calls.push({ command: target ?? command, windowsHide: options.windowsHide })
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => undefined
+      queueMicrotask(() => {
+        if (!target) child.emit('error', new Error('missing'))
+        else child.emit('exit', target === 'pwsh.exe' ? 1 : 0)
+      })
+      return child as never
+    }) as never,
+  )
+  assert.deepEqual(calls, [
+    { command: 'wt.exe', windowsHide: false },
+    { command: 'alacritty.exe', windowsHide: false },
+    { command: 'wezterm.exe', windowsHide: false },
+    { command: 'pwsh.exe', windowsHide: true },
+    { command: 'powershell.exe', windowsHide: true },
+  ])
 })
 
 test('falls back to the default WSL distribution when its name is unavailable', () => {

@@ -87,7 +87,7 @@ async function shutdown(exitCode: number): Promise<void> {
   for (const client of clients) client.end()
   await Promise.race([
     Promise.all([serverClosed, terminateAllPiProcesses()]),
-    new Promise<void>((resolve) => setTimeout(resolve, 3_000)),
+    new Promise<void>((resolve) => setTimeout(resolve, 4_000)),
   ])
   for (const client of clients) client.destroy()
   process.exit(exitCode)
@@ -245,7 +245,7 @@ async function startSession(summary: SessionSummary): Promise<void> {
     summary.status = 'idle'
   } catch (error) {
     sessions.delete(summary.id)
-    pi.terminate()
+    await pi.terminate()
     throw error
   }
 }

@@ -5,9 +5,10 @@ the active session. The process starts, runs the prompt, extracts the
 assistant's response, and terminates — no messages, tool calls, or state leak
 into the current conversation.
 
-> Each isolated prompt runs with its own dedicated Pi profile
-> (`~/.pi/livecraft-isolated/`). Pi may persist its model and thinking
-> defaults there, but those writes never reach your main Pi configuration.
+> Each isolated prompt runs with its own dedicated Pi profile under the user's
+> home directory (`.pi/livecraft-isolated`; for example,
+> `C:\Users\Ada\.pi\livecraft-isolated` on Windows). Pi may persist its model and
+> thinking defaults there, but those writes never reach your main Pi configuration.
 > The defaults you see in new sessions stay exactly as you left them.
 
 Use it when you need a quick Pi query from a widget, command, or UI element
@@ -26,7 +27,7 @@ server/manager.ts   (resolves cwd from session, delegates)
     │
     ▼
 server/run-isolated-prompt.ts
-    │  PiProcess(isolated: true, PI_CODING_AGENT_DIR=~/.pi/livecraft-isolated, ...)
+    │  PiProcess(isolated: true, PI_CODING_AGENT_DIR=<home>/.pi/livecraft-isolated, ...)
     │  → set_model (or auto-select cheapest)
     │  → prompt
     │  → wait agent_settled

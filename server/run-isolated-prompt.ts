@@ -116,7 +116,7 @@ export async function runIsolatedPrompt(
 
     return { text, cost }
   } finally {
-    pi.terminate()
+    await pi.terminate()
   }
 }
 /** Waits for a terminal Pi event while bounding failures from a stalled disposable process. */

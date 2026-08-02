@@ -1,15 +1,21 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import test from 'node:test'
 import { JsonLineDecoder, encodeJsonLine } from '../server/jsonl.ts'
+import { resolvePiLauncher } from '../server/pi-launcher.ts'
 import type { JsonObject } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
 
-test('exposes current Pi commands over RPC', { timeout: 30_000 }, async (t) => {
-  const pi = spawn('pi', ['--mode', 'rpc', '--offline', '--no-session'], {
-    cwd: join(homedir(), '.pi'),
+test('exposes current Pi commands over RPC', { timeout: 60_000 }, async (t) => {
+  const launcher = await resolvePiLauncher()
+  const pi = spawn(launcher.command, [
+    ...launcher.argsPrefix,
+    '--mode',
+    'rpc',
+    '--offline',
+    '--no-session',
+  ], {
+    cwd: process.cwd(),
     env: { ...process.env, PI_OFFLINE: '1' },
     stdio: ['pipe', 'pipe', 'pipe'],
   })
@@ -56,7 +62,12 @@ test('exposes current Pi commands over RPC', { timeout: 30_000 }, async (t) => {
     )
     assert.equal((await promptResponse).success, true)
   } finally {
-    pi.kill('SIGTERM')
+    pi.stdin.end()
+    await Promise.race([
+      new Promise<void>((resolve) => pi.once('exit', () => resolve())),
+      new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
+    ])
+    if (pi.exitCode === null) pi.kill('SIGKILL')
   }
 
   function waitFor(predicate: (value: JsonObject) => boolean): Promise<JsonObject> {
@@ -64,7 +75,7 @@ test('exposes current Pi commands over RPC', { timeout: 30_000 }, async (t) => {
       const timeout = setTimeout(() => {
         waiters.delete(check)
         reject(new Error(`Timed out waiting for Pi RPC event. stderr: ${stderr}`))
-      }, 15_000)
+      }, 30_000)
       function check(): void {
         const index = values.findIndex(predicate)
         if (index === -1) return

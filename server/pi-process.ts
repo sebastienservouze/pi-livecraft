@@ -1,10 +1,11 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
-import { EventEmitter } from 'node:events'
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { EventEmitter } from 'node:events'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { JsonLineDecoder, encodeJsonLine } from './jsonl.ts'
+import { resolvePiLauncher } from './pi-launcher.ts'
 import type { JsonObject } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
 
@@ -45,6 +46,7 @@ export class PiProcess extends EventEmitter {
     options: PiProcessOptions = {},
   ) {
     super()
+    const launcher = resolvePiLauncher()
     const args = options.isolated
       ? [
         '--mode',
@@ -76,10 +78,12 @@ export class PiProcess extends EventEmitter {
     const env = options.isolated
       ? { ...process.env, PI_CODING_AGENT_DIR: ISOLATED_AGENT_DIR }
       : process.env
-    this.child = spawn('pi', args, {
+    this.child = spawn(launcher.command, [...launcher.argsPrefix, ...args], {
       cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      shell: false,
+      windowsHide: true,
     })
     activeChildren.add(this.child)
 
@@ -130,8 +134,9 @@ export class PiProcess extends EventEmitter {
     this.child.stdin.write(encodeJsonLine(command))
   }
 
-  terminate(): void {
-    this.child.kill('SIGTERM')
+  /** Stops Pi gracefully before force-killing an unresponsive child. */
+  async terminate(graceMs = 2_000): Promise<void> {
+    await terminateChild(this.child, graceMs)
   }
 
   /** Distinguishes expected responses from asynchronous events emitted by Pi. */
@@ -162,18 +167,50 @@ export class PiProcess extends EventEmitter {
   }
 }
 
-/** Terminates every Pi child owned by this process and force-kills stragglers after the grace period. */
+/** Terminates every tracked Pi child and waits for their bounded cleanup. */
 export async function terminateAllPiProcesses(graceMs = 2_000): Promise<void> {
-  const children = [...activeChildren]
-  if (children.length === 0) return
-  const exited = Promise.all(
-    children.map((child) => new Promise<void>((resolve) => child.once('exit', () => resolve()))),
-  )
-  for (const child of children) child.kill('SIGTERM')
-  await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, graceMs))])
-  for (const child of activeChildren) child.kill('SIGKILL')
-  await Promise.race([
-    exited,
-    new Promise<void>((resolve) => setTimeout(resolve, Math.min(750, graceMs))),
+  await Promise.all([...activeChildren].map((child) => terminateChild(child, graceMs)))
+}
+
+async function terminateChild(
+  child: ChildProcessWithoutNullStreams,
+  graceMs: number,
+): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()))
+  if (process.platform === 'win32') child.stdin.end()
+  else child.kill('SIGTERM')
+  if (await settlesWithin(exited, graceMs)) return
+  await forceKillChild(child)
+  await settlesWithin(exited, Math.min(750, graceMs))
+}
+
+/** Force-kills a child, including its descendants through taskkill on Windows. */
+export async function forceKillChild(child: ChildProcess): Promise<void> {
+  if (process.platform === 'win32' && child.pid && await taskkillProcessTree(child.pid)) return
+  child.kill('SIGKILL')
+}
+
+function taskkillProcessTree(pid: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    try {
+      const taskkill = spawn('taskkill.exe', ['/pid', String(pid), '/t', '/f'], {
+        shell: false,
+        stdio: 'ignore',
+        timeout: 750,
+        windowsHide: true,
+      })
+      taskkill.once('error', () => resolve(false))
+      taskkill.once('close', (code) => resolve(code === 0))
+    } catch {
+      resolve(false)
+    }
+  })
+}
+
+async function settlesWithin(promise: Promise<void>, timeoutMs: number): Promise<boolean> {
+  return Promise.race([
+    promise.then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), timeoutMs)),
   ])
 }

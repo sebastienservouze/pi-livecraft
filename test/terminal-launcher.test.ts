@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  defaultTerminalInvocation,
+  defaultTerminalInvocations,
   parseTerminalTemplate,
   tokenizeTemplate,
   TerminalTemplateError,
@@ -15,8 +15,16 @@ test('strips double quotes around a token', () => {
   assert.deepEqual(tokenizeTemplate('cmd "arg with spaces"'), ['cmd', 'arg with spaces'])
 })
 
-test('handles backslash escapes', () => {
+test('handles backslash escapes without corrupting Windows paths', () => {
   assert.deepEqual(tokenizeTemplate('cmd arg\\ with\\ spaces'), ['cmd', 'arg with spaces'])
+  assert.deepEqual(
+    tokenizeTemplate('wt.exe -d "C:\\Users\\Jane Doe\\project"'),
+    ['wt.exe', '-d', 'C:\\Users\\Jane Doe\\project'],
+  )
+  assert.deepEqual(tokenizeTemplate('cmd \\\\server\\share\\project'), [
+    'cmd',
+    '\\\\server\\share\\project',
+  ])
 })
 
 test('collapses multiple spaces outside quotes', () => {
@@ -34,24 +42,28 @@ test('replaces {cwd} inside a longer token', () => {
 })
 
 test('uses the platform terminal defaults', () => {
-  assert.deepEqual(defaultTerminalInvocation('/home/user', 'linux'), {
+  assert.deepEqual(defaultTerminalInvocations('/home/user', 'linux'), [{
     command: 'x-terminal-emulator',
     args: [],
     cwd: '/home/user',
-  })
+  }])
   assert.deepEqual(
-    defaultTerminalInvocation('/home/user', 'wsl', { WSL_DISTRO_NAME: 'Ubuntu-22.04' }),
-    {
+    defaultTerminalInvocations('/home/user', 'wsl', { WSL_DISTRO_NAME: 'Ubuntu-22.04' }),
+    [{
       command: 'wt.exe',
       args: ['nt', '--', 'wsl.exe', '-d', 'Ubuntu-22.04', '--cd', '/home/user'],
-    },
+    }],
   )
+  assert.deepEqual(defaultTerminalInvocations('C:\\work', 'windows'), [
+    { command: 'wt.exe', args: ['-d', 'C:\\work'] },
+    { command: 'powershell.exe', args: ['-NoExit'], cwd: 'C:\\work' },
+  ])
 })
 
 test('falls back to the default WSL distribution when its name is unavailable', () => {
   assert.deepEqual(
-    defaultTerminalInvocation('/home/user', 'wsl', { WSL_INTEROP: '/run/WSL/1_interop' }),
-    { command: 'wt.exe', args: ['nt', '--', 'wsl.exe', '--cd', '/home/user'] },
+    defaultTerminalInvocations('/home/user', 'wsl', { WSL_INTEROP: '/run/WSL/1_interop' }),
+    [{ command: 'wt.exe', args: ['nt', '--', 'wsl.exe', '--cd', '/home/user'] }],
   )
 })
 

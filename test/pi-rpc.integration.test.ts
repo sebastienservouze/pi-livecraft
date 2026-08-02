@@ -4,13 +4,19 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { JsonLineDecoder, encodeJsonLine } from '../server/jsonl.ts'
+import { piSpawnInvocation, terminatePiChild } from '../server/pi-process.ts'
 import type { JsonObject } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
 
 test('exposes current Pi commands over RPC', { timeout: 30_000 }, async (t) => {
-  const pi = spawn('pi', ['--mode', 'rpc', '--offline', '--no-session'], {
+  const invocation = piSpawnInvocation(
+    ['--mode', 'rpc', '--offline', '--no-session'],
+    process.platform,
+    { ...process.env, PI_OFFLINE: '1' },
+  )
+  const pi = spawn(invocation.command, invocation.args, {
     cwd: join(homedir(), '.pi'),
-    env: { ...process.env, PI_OFFLINE: '1' },
+    env: invocation.env,
     stdio: ['pipe', 'pipe', 'pipe'],
   })
   const values: JsonObject[] = []
@@ -56,7 +62,7 @@ test('exposes current Pi commands over RPC', { timeout: 30_000 }, async (t) => {
     )
     assert.equal((await promptResponse).success, true)
   } finally {
-    pi.kill('SIGTERM')
+    terminatePiChild(pi)
   }
 
   function waitFor(predicate: (value: JsonObject) => boolean): Promise<JsonObject> {

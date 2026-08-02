@@ -1,14 +1,60 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawn, type ChildProcess, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import { randomUUID } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { JsonLineDecoder, encodeJsonLine } from './jsonl.ts'
 import type { JsonObject } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
 
 const activeChildren = new Set<ChildProcessWithoutNullStreams>()
+const windowsPiScriptPattern =
+  /\$basedir[\\/]([^"'`\r\n]*@earendil-works[\\/]pi-coding-agent[\\/][^"'`\r\n]+\.[cm]?js)/i
+
+/** Resolves Pi's native executable or npm shim target without passing user arguments through a shell. */
+function windowsPiInvocation(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+): { command: string; args: string[] } {
+  const pathValue = Object
+    .entries(env)
+    .find(([name]) => name.toLowerCase() === 'path')
+    ?.[1]
+  if (!pathValue) throw new Error('PATH is unavailable; cannot locate the Pi command')
+
+  for (const value of pathValue.split(';')) {
+    const directory = value.trim().replace(/^"(.*)"$/, '$1')
+    if (!directory) continue
+
+    const executable = join(directory, 'pi.exe')
+    if (existsSync(executable)) return { command: executable, args: [...args] }
+
+    try {
+      const target = readFileSync(join(directory, 'pi.ps1'), 'utf8')
+        .match(windowsPiScriptPattern)
+        ?.[1]
+      if (!target) continue
+      const command = resolve(directory, target)
+      if (existsSync(command)) return { command: process.execPath, args: [command, ...args] }
+    } catch {
+      // This PATH entry does not expose Pi through an npm PowerShell shim.
+    }
+  }
+
+  throw new Error('Pi is not installed as a Windows executable or npm command shim on PATH')
+}
+
+/** Builds a shell-free Pi invocation so paths and prompts remain exact on every platform. */
+export function piSpawnInvocation(
+  args: readonly string[],
+  platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): { command: string; args: string[]; env: NodeJS.ProcessEnv } {
+  if (platform !== 'win32') return { command: 'pi', args: [...args], env }
+  return { ...windowsPiInvocation(args, env), env }
+}
 
 /** Dedicated Pi profile directory for isolated prompts so model/thinking defaults never leak into the user's main config. */
 export const ISOLATED_AGENT_DIR = join(homedir(), '.pi', 'livecraft-isolated')
@@ -76,9 +122,10 @@ export class PiProcess extends EventEmitter {
     const env = options.isolated
       ? { ...process.env, PI_CODING_AGENT_DIR: ISOLATED_AGENT_DIR }
       : process.env
-    this.child = spawn('pi', args, {
+    const invocation = piSpawnInvocation(args, process.platform, env)
+    this.child = spawn(invocation.command, invocation.args, {
       cwd,
-      env,
+      env: invocation.env,
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     activeChildren.add(this.child)
@@ -131,7 +178,7 @@ export class PiProcess extends EventEmitter {
   }
 
   terminate(): void {
-    this.child.kill('SIGTERM')
+    terminatePiChild(this.child)
   }
 
   /** Distinguishes expected responses from asynchronous events emitted by Pi. */
@@ -162,6 +209,25 @@ export class PiProcess extends EventEmitter {
   }
 }
 
+/** Requests Pi shutdown and force-kills its Windows process tree if EOF is ignored. */
+export function terminatePiChild(
+  child: ChildProcessWithoutNullStreams,
+  platform = process.platform,
+  graceMs = 2_000,
+): void {
+  if (platform !== 'win32') {
+    child.kill('SIGTERM')
+    return
+  }
+
+  if (child.stdin.writable) child.stdin.end()
+  const timeout = setTimeout(() => {
+    if (child.exitCode === null) void forceKillWindowsProcessTree(child)
+  }, graceMs)
+  timeout.unref()
+  child.once('exit', () => clearTimeout(timeout))
+}
+
 /** Terminates every Pi child owned by this process and force-kills stragglers after the grace period. */
 export async function terminateAllPiProcesses(graceMs = 2_000): Promise<void> {
   const children = [...activeChildren]
@@ -169,11 +235,35 @@ export async function terminateAllPiProcesses(graceMs = 2_000): Promise<void> {
   const exited = Promise.all(
     children.map((child) => new Promise<void>((resolve) => child.once('exit', () => resolve()))),
   )
-  for (const child of children) child.kill('SIGTERM')
+  for (const child of children) {
+    if (process.platform === 'win32') {
+      if (child.stdin.writable) child.stdin.end()
+    } else child.kill('SIGTERM')
+  }
   await Promise.race([exited, new Promise<void>((resolve) => setTimeout(resolve, graceMs))])
-  for (const child of activeChildren) child.kill('SIGKILL')
+  if (process.platform === 'win32')
+    await Promise.all([...activeChildren].map(forceKillWindowsProcessTree))
+  else for (const child of activeChildren) child.kill('SIGKILL')
   await Promise.race([
     exited,
     new Promise<void>((resolve) => setTimeout(resolve, Math.min(750, graceMs))),
   ])
+}
+
+/** Kills a Windows process and every descendant because Windows has no POSIX signal tree. */
+export function forceKillWindowsProcessTree(child: ChildProcess): Promise<void> {
+  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return Promise.resolve()
+  return new Promise((resolve) => {
+    const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], {
+      stdio: 'ignore',
+    })
+    killer.once('error', () => {
+      child.kill('SIGKILL')
+      resolve()
+    })
+    killer.once('exit', (code) => {
+      if (code !== 0) child.kill('SIGKILL')
+      resolve()
+    })
+  })
 }

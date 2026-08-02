@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { normalize } from 'node:path'
 import type {
   GitCommit,
   GitFileChange,
@@ -13,6 +14,9 @@ interface GitCommandResult {
   stderr: string
   stdout: string
 }
+
+// Git for Windows recognizes this sentinel, unlike Node's native `\\.\nul` device path.
+const gitEmptyFile = '/dev/null'
 
 /** Aggregates Git state, file statistics, and the number of commits waiting to be pushed. */
 export async function getGitSnapshot(cwd: string): Promise<GitSnapshot> {
@@ -40,7 +44,7 @@ export async function getGitSnapshot(cwd: string): Promise<GitSnapshot> {
           '--numstat',
           '-z',
           '--',
-          '/dev/null',
+          gitEmptyFile,
           change.path,
         ], [0, 1])
         const [count] = parseNumstat(result.stdout)
@@ -57,7 +61,7 @@ export async function getGitSnapshot(cwd: string): Promise<GitSnapshot> {
 
   return {
     repository: true,
-    root: root.stdout.trim() || null,
+    root: root.stdout.trim() ? normalize(root.stdout.trim()) : null,
     branch: branch.stdout.trim() || 'HEAD',
     files: changes.map((change) => {
       const count = counts.get(change.path)
@@ -101,7 +105,7 @@ export async function getGitFileDiff(
   const trackedDiff = await runGit(cwd, ['diff', 'HEAD', '--', path], [0, 128])
   if (trackedDiff.stdout) return { path, diff: trackedDiff.stdout }
 
-  const untrackedDiff = await runGit(cwd, ['diff', '--no-index', '--', '/dev/null', path], [0, 1])
+  const untrackedDiff = await runGit(cwd, ['diff', '--no-index', '--', gitEmptyFile, path], [0, 1])
   return { path, diff: untrackedDiff.stdout }
 }
 

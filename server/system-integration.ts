@@ -1,14 +1,15 @@
 import { spawn } from 'node:child_process'
 
-export type DesktopPlatform = 'linux' | 'wsl'
+export type DesktopPlatform = 'linux' | 'windows' | 'wsl'
 
-/** Identifies the supported Linux desktop environment from the process platform and WSL markers. */
+/** Identifies the supported desktop environment from the process platform and WSL markers. */
 export function getDesktopPlatform(
   platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): DesktopPlatform {
-  if (platform !== 'linux') throw new Error(`Unsupported platform: ${platform}`)
-  return env.WSL_DISTRO_NAME || env.WSL_INTEROP ? 'wsl' : 'linux'
+  if (platform === 'win32') return 'windows'
+  if (platform === 'linux') return env.WSL_DISTRO_NAME || env.WSL_INTEROP ? 'wsl' : 'linux'
+  throw new Error(`Unsupported platform: ${platform}`)
 }
 
 /** Returns the WSL distribution running the backend when its name is available. */
@@ -16,12 +17,12 @@ export function getWslDistributionName(env: NodeJS.ProcessEnv = process.env): st
   return env.WSL_DISTRO_NAME || undefined
 }
 
-/** Opens a file or directory with its default application in the current Linux environment. */
+/** Opens a file or directory with its default desktop application. */
 export async function openPath(
   path: string,
   platform = getDesktopPlatform(),
 ): Promise<void> {
-  const command = platform === 'wsl' ? 'explorer.exe' : 'xdg-open'
+  const command = platform === 'linux' ? 'xdg-open' : 'explorer.exe'
   await openApplication(command, await externalWorkspacePath(path, platform))
 }
 

@@ -15,11 +15,12 @@ Launch errors appear as regular Livecraft notifications.
 With no custom command, the backend chooses the platform launcher:
 
 - Linux uses `x-terminal-emulator` with the workspace as its working directory;
-- WSL uses `wt.exe`, preserves the current distribution when available, and opens at the workspace path.
+- WSL uses `wt.exe`, preserves the current distribution when available, and opens at the workspace path;
+- native Windows uses `wt.exe` at the workspace path and falls back to a detached Windows PowerShell window when Windows Terminal is unavailable.
 
 The terminal starts detached from the backend, so it remains an ordinary external application after launch.
 
-A custom command can be entered in Settings. It must contain `{cwd}`, which the backend replaces with the validated workspace path. Double quotes group arguments and backslashes escape the next character. The template is parsed as a command and arguments, not passed through a shell.
+A custom command can be entered in Settings. It must contain `{cwd}`, which the backend replaces with the validated workspace path. Double quotes group arguments; backslashes escape spaces or quotes and otherwise remain intact for Windows paths. The template is parsed as a command and arguments, not passed through a shell.
 
 ## Ownership and data flow
 

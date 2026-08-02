@@ -58,7 +58,7 @@ All documentation in the project (except this README) is primarily meant to be r
 
 ## Quick start
 
-You need **Node.js 24+**, **npm**, and a configured **Pi**. Linux and WSL are supported.
+You need **Node.js 24+**, **npm**, and a configured **Pi**. Linux and WSL are supported. Native Windows 10/11 support is experimental and requires a Bash installation for Pi; Git for Windows is the simplest option.
 
 **[Fork the repository](https://github.com/sebastienservouze/pi-livecraft/fork)**, then run:
 
@@ -108,7 +108,7 @@ Open [http://127.0.0.1:5173](http://127.0.0.1:5173) and you should see Livecraft
 
 - **Provider quotas:** see OpenAI Codex and GitHub Copilot usage windows in one panel (I only use these, ahah. Feel free to add your provider.)
 
-- **Terminal:** open an external Linux or WSL terminal in the current workspace from the rail, palette, or a shortcut
+- **Terminal:** open an external Linux, WSL, or Windows terminal in the current workspace from the rail, palette, or a shortcut
 
 ### Shape the workbench
 
@@ -212,6 +212,8 @@ When these extensions are installed and configured in Pi, Livecraft already cont
 - A new session cannot answer: launch Pi once, configure a provider with `/login`, and verify that the `/agent` extension is available if your setup expects it.
 - Linux desktop actions unavailable: install or expose `xdg-open` and `x-terminal-emulator` in `PATH`.
 - WSL desktop actions unavailable: verify that `explorer.exe`, `wslpath`, and `wt.exe` are available in the WSL `PATH`.
+- Windows cannot start Pi: verify that the npm `pi.ps1` shim is in `PATH`. Pi also needs Bash; it detects Git Bash automatically, or accepts `shellPath` in `~/.pi/agent/settings.json`.
+- Windows terminal unavailable: install Windows Terminal for `wt.exe`, or verify that the built-in `powershell.exe` fallback is in `PATH`.
 
 </details>
 

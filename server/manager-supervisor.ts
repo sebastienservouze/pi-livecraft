@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { calculateManagerRuntimeRevision } from './manager-runtime.ts'
+import { forceKillWindowsProcessTree } from './pi-process.ts'
 
 const managerEntry = fileURLToPath(new URL('./manager.ts', import.meta.url))
 const restartExitCode = 75
@@ -55,6 +56,11 @@ function stop(signal: NodeJS.Signals): void {
   if (failureHold) clearInterval(failureHold)
   if (!child) {
     process.exit(0)
+    return
+  }
+  if (process.platform === 'win32') {
+    const manager = child
+    setTimeout(() => void forceKillWindowsProcessTree(manager), 3_000).unref()
     return
   }
   child.kill(signal)

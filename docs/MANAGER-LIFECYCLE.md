@@ -38,11 +38,11 @@ The backend emits these states through the `manager_status` SSE event. `canResta
 1. The frontend calls `POST /api/manager/restart` through `src/api.ts`.
 2. The backend requires a connected, stale, supervised manager and rejects duplicate requests.
 3. The manager performs the authoritative check: no tracked request may remain, and each Pi process must report no streaming, compaction, queued message, or pending blocking UI.
-4. After acknowledging the request, the manager closes its TCP server and Pi children, escalating from `SIGTERM` to `SIGKILL` within bounded time, then exits with code `75`.
+4. After acknowledging the request, the manager closes its TCP server and Pi children. It requests `SIGTERM` on POSIX or closes Pi's input on Windows, then force-kills any remaining process or Windows process tree within bounded time before exiting with code `75`.
 5. Only that exit code lets the supervisor calculate a fresh revision and start the replacement.
 6. The monitor returns to `current` only after a different manager instance reconnects with the expected revision.
 
-Idle Pi processes are closed by this restart. Their persisted sessions remain in history and can be reopened. If the manager crashes or exits with another code, the supervisor stays alive without relaunching it; restart Pi Livecraft to recover.
+Idle Pi processes are closed by this restart. Their persisted sessions remain in history and can be reopened. On native Windows, application shutdown gives the manager a bounded grace period, then terminates its complete Pi process tree instead of relying on non-propagating POSIX signals. If the manager crashes or exits with another code, the supervisor stays alive without relaunching it; restart Pi Livecraft to recover.
 
 ## Changing this lifecycle
 

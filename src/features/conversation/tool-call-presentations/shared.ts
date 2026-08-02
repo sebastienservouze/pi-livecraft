@@ -34,6 +34,18 @@ export function readLineRange(args: Record<string, unknown>): string | undefined
 export function pathFromRepositoryRoot(path: string, repositoryRoot?: string | null): string {
   if (!repositoryRoot) return path
 
+  if (
+    /^[A-Za-z]:[\\/]/.test(repositoryRoot) || repositoryRoot.startsWith('\\\\')
+    || repositoryRoot.startsWith('//')
+  ) {
+    const root = repositoryRoot.replace(/\\/g, '/').replace(/\/+$/, '')
+    const normalizedPath = path.replace(/\\/g, '/')
+    if (normalizedPath.replace(/\/+$/, '').toLowerCase() === root.toLowerCase()) return '.'
+    return normalizedPath.toLowerCase().startsWith(`${root.toLowerCase()}/`)
+      ? normalizedPath.slice(root.length + 1)
+      : path
+  }
+
   const root = repositoryRoot.replace(/\/+$/, '')
   if (path === root) return '.'
   return path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path

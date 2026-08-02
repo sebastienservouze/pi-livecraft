@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
-import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { connect, type Socket } from 'node:net'
 import test from 'node:test'
@@ -16,7 +16,7 @@ test(
       env: { ...process.env, PI_LIVECRAFT_MANAGER_PORT: 'invalid' },
       stdio: ['ignore', 'ignore', 'pipe'],
     })
-    t.after(() => supervisor.kill('SIGKILL'))
+    t.after(() => stopChild(supervisor))
     let errors = ''
     supervisor.stderr.on('data', (chunk: Buffer) => {
       errors += chunk.toString('utf8')
@@ -27,8 +27,7 @@ test(
     assert.equal(supervisor.exitCode, null)
     assert.equal(errors.match(/PI_LIVECRAFT_MANAGER_PORT must be a valid port/g)?.length, 1)
 
-    supervisor.kill('SIGTERM')
-    await once(supervisor, 'exit')
+    await stopChild(supervisor)
   },
 )
 
@@ -68,8 +67,7 @@ test(
       }
     } finally {
       firstClient.close()
-      supervisor.kill('SIGTERM')
-      await once(supervisor, 'exit')
+      await stopChild(supervisor)
     }
   },
 )
@@ -82,7 +80,7 @@ test('reconciles live Pi work before restarting the manager', { timeout: 10_000 
     cwd: process.cwd(),
     env: {
       ...process.env,
-      PATH: `${directory}:${process.env.PATH}`,
+      PATH: `${directory}${delimiter}${process.env.PATH}`,
       PI_LIVECRAFT_MANAGER_PORT: String(port),
       PI_LIVECRAFT_MANAGER_RESTART_EXIT_CODE: '75',
       PI_LIVECRAFT_MANAGER_RUNTIME_REVISION: 'test-revision',
@@ -173,8 +171,7 @@ test('reconciles live Pi work before restarting the manager', { timeout: 10_000 
   } finally {
     client.close()
     if (manager.exitCode === null) {
-      manager.kill('SIGTERM')
-      await once(manager, 'exit')
+      await stopChild(manager)
     }
     await rm(directory, { force: true, recursive: true })
   }
@@ -191,7 +188,7 @@ test(
       cwd: process.cwd(),
       env: {
         ...process.env,
-        PATH: `${directory}:${process.env.PATH}`,
+        PATH: `${directory}${delimiter}${process.env.PATH}`,
         PI_LIVECRAFT_MANAGER_PORT: String(port),
       },
       stdio: 'ignore',
@@ -213,8 +210,7 @@ test(
       await opening
     } finally {
       client.close()
-      manager.kill('SIGTERM')
-      await once(manager, 'exit')
+      await stopChild(manager)
       await rm(directory, { force: true, recursive: true })
     }
   },
@@ -228,7 +224,7 @@ test('completes a manual compact without timeout', { timeout: 10_000 }, async ()
     cwd: process.cwd(),
     env: {
       ...process.env,
-      PATH: `${directory}:${process.env.PATH}`,
+      PATH: `${directory}${delimiter}${process.env.PATH}`,
       PI_LIVECRAFT_MANAGER_PORT: String(port),
     },
     stdio: 'ignore',
@@ -250,8 +246,7 @@ test('completes a manual compact without timeout', { timeout: 10_000 }, async ()
     assert.equal(isObject(startEvent.data) && startEvent.data.type, 'compaction_start')
   } finally {
     client.close()
-    manager.kill('SIGTERM')
-    await once(manager, 'exit')
+    await stopChild(manager)
     await rm(directory, { force: true, recursive: true })
   }
 })
@@ -264,7 +259,7 @@ test('restarts an exited Pi session when reopening it', { timeout: 10_000 }, asy
     cwd: process.cwd(),
     env: {
       ...process.env,
-      PATH: `${directory}:${process.env.PATH}`,
+      PATH: `${directory}${delimiter}${process.env.PATH}`,
       PI_LIVECRAFT_MANAGER_PORT: String(port),
     },
     stdio: 'ignore',
@@ -293,8 +288,7 @@ test('restarts an exited Pi session when reopening it', { timeout: 10_000 }, asy
     assert.notEqual(sessionId(reopened), sessionId(first))
   } finally {
     client.close()
-    manager.kill('SIGTERM')
-    await once(manager, 'exit')
+    await stopChild(manager)
     await rm(directory, { force: true, recursive: true })
   }
 })
@@ -307,7 +301,7 @@ test('improves a prompt with the cheapest isolated model', { timeout: 10_000 }, 
     cwd: process.cwd(),
     env: {
       ...process.env,
-      PATH: `${directory}:${process.env.PATH}`,
+      PATH: `${directory}${delimiter}${process.env.PATH}`,
       PI_LIVECRAFT_MANAGER_PORT: String(port),
     },
     stdio: 'ignore',
@@ -329,8 +323,7 @@ test('improves a prompt with the cheapest isolated model', { timeout: 10_000 }, 
     })
   } finally {
     client.close()
-    manager.kill('SIGTERM')
-    await once(manager, 'exit')
+    await stopChild(manager)
     await rm(directory, { force: true, recursive: true })
   }
 })
@@ -343,7 +336,7 @@ test('improves a prompt with a direction preset', { timeout: 10_000 }, async () 
     cwd: process.cwd(),
     env: {
       ...process.env,
-      PATH: `${directory}:${process.env.PATH}`,
+      PATH: `${directory}${delimiter}${process.env.PATH}`,
       PI_LIVECRAFT_MANAGER_PORT: String(port),
     },
     stdio: 'ignore',
@@ -366,18 +359,24 @@ test('improves a prompt with a direction preset', { timeout: 10_000 }, async () 
     })
   } finally {
     client.close()
-    manager.kill('SIGTERM')
-    await once(manager, 'exit')
+    await stopChild(manager)
     await rm(directory, { force: true, recursive: true })
   }
 })
 
 async function writeFakePi(directory: string, emitStartupEvent = false): Promise<void> {
-  const path = join(directory, 'pi')
+  const windowsTargetDirectory = join(
+    directory,
+    'node_modules/@earendil-works/pi-coding-agent/dist',
+  )
+  const scriptPath = process.platform === 'win32'
+    ? join(windowsTargetDirectory, 'cli.mjs')
+    : join(directory, 'fake-pi.mjs')
+  const launcherPath = join(directory, process.platform === 'win32' ? 'pi.ps1' : 'pi')
+  if (process.platform === 'win32') await mkdir(windowsTargetDirectory, { recursive: true })
   await writeFile(
-    path,
-    `#!/usr/bin/env node
-import readline from 'node:readline'
+    scriptPath,
+    `import readline from 'node:readline'
 const isolated = process.argv.includes('--no-session')
 const sessionPath = process.argv[process.argv.indexOf('--session') + 1]
 const expectedExtension = ${
@@ -460,7 +459,15 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
 })
 `,
   )
-  await chmod(path, 0o755)
+  if (process.platform === 'win32') {
+    await writeFile(
+      launcherPath,
+      '& "node$exe" "$basedir/node_modules/@earendil-works/pi-coding-agent/dist/cli.mjs" $args\r\n',
+    )
+  } else {
+    await writeFile(launcherPath, `#!/usr/bin/env node\nimport './fake-pi.mjs'\n`)
+    await chmod(launcherPath, 0o755)
+  }
 }
 
 interface ManagerResponse {
@@ -593,6 +600,23 @@ function isManagerEvent(value: unknown): value is ManagerEvent {
   return isObject(value) && value.kind === 'event' && typeof value.event === 'string'
     && typeof value.sessionId === 'string'
 }
-function once(process: ReturnType<typeof spawn>, event: 'exit'): Promise<void> {
-  return new Promise((resolve) => process.once(event, () => resolve()))
+/** Stops the complete test process tree on Windows, where child signals do not propagate. */
+async function stopChild(child: ReturnType<typeof spawn>): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return
+  const exited = once(child, 'exit')
+  if (process.platform === 'win32' && child.pid) {
+    const killer = spawn('taskkill.exe', ['/pid', String(child.pid), '/t', '/f'], {
+      stdio: 'ignore',
+    })
+    const [code] = await once(killer, 'exit')
+    if (code !== 0) child.kill('SIGKILL')
+  } else child.kill('SIGTERM')
+  await exited
+}
+
+function once(
+  process: ReturnType<typeof spawn>,
+  event: 'exit',
+): Promise<[code: number | null, signal: NodeJS.Signals | null]> {
+  return new Promise((resolve) => process.once(event, (code, signal) => resolve([code, signal])))
 }

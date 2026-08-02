@@ -4,4 +4,4 @@
 
 Keep session-list reconciliation and workspace/session persistence in this controller. `App.tsx` supplies cross-feature callbacks, such as clearing feature state when the workspace changes or preparing an initial composer draft; it should not duplicate the controller's state.
 
-Directory browsing remains in `DirectoryPicker`. Pure list and persistence rules live in the neighboring `sidebar-sessions.ts` and `recent-workspaces.ts` modules.
+Directory browsing remains in `DirectoryPicker`. Completion accepts POSIX paths, `~/…`, Windows drive letters, and UNC shares while preserving the entered separator style. Pure list and persistence rules live in the neighboring `sidebar-sessions.ts` and `recent-workspaces.ts` modules.

@@ -149,6 +149,20 @@ test('displays file tool paths relative to the repository and truncates them', (
     },
   )
   assert.deepEqual(toolCallPresentation({ id: 'call_3', name: 'read', args: {} }, root), {})
+  assert.deepEqual(
+    toolCallPresentation(
+      { id: 'call_4', name: 'read', args: { path: 'C:\\Work\\Repository\\src\\App.tsx' } },
+      'C:/work/repository',
+    ),
+    { headerDetail: { text: 'src/App.tsx', title: 'src/App.tsx' } },
+  )
+  assert.deepEqual(
+    toolCallPresentation(
+      { id: 'call_5', name: 'read', args: { path: '\\\\SERVER\\share\\repo\\README.md' } },
+      '//server/share/repo',
+    ),
+    { headerDetail: { text: 'README.md', title: 'README.md' } },
+  )
 })
 
 test('keeps the read range visible beside a truncated path', () => {

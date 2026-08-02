@@ -483,7 +483,7 @@ async function resolveWorkingDirectory(input: string): Promise<string> {
   if (!trimmed) throw new HttpError(400, 'Working directory is required')
   const expanded = trimmed === '~'
     ? homedir()
-    : trimmed.startsWith('~/')
+    : trimmed.startsWith('~/') || trimmed.startsWith('~\\')
     ? resolve(homedir(), trimmed.slice(2))
     : trimmed
   let canonical: string

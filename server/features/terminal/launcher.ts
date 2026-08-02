@@ -7,6 +7,12 @@ import {
 
 const maxTemplateLength = 2000
 
+interface TerminalInvocation {
+  command: string
+  args: string[]
+  cwd?: string
+}
+
 export class TerminalTemplateError extends Error {
   constructor(message: string) {
     super(message)
@@ -15,8 +21,8 @@ export class TerminalTemplateError extends Error {
 }
 
 /**
- * Tokenizes a command template respecting double-quote grouping and backslash escapes.
- * Spaces outside quotes separate tokens; quotes are removed from the result.
+ * Tokenizes a command template respecting double-quote grouping and explicit escapes.
+ * Backslashes are preserved for Windows paths unless they escape a space or quote.
  */
 export function tokenizeTemplate(template: string): string[] {
   const tokens: string[] = []
@@ -26,7 +32,10 @@ export function tokenizeTemplate(template: string): string[] {
   for (let i = 0; i < template.length; i += 1) {
     const ch = template[i]
 
-    if (ch === '\\' && i + 1 < template.length) {
+    if (
+      ch === '\\' && i + 1 < template.length
+      && (template[i + 1] === ' ' || template[i + 1] === '"')
+    ) {
       current += template[i + 1]
       i += 1
       continue
@@ -80,26 +89,33 @@ export function parseTerminalTemplate(
   return { command, args }
 }
 
-/** Returns the platform-specific terminal invocation used when no custom template is set. */
-export function defaultTerminalInvocation(
+/** Returns the platform-specific terminal launchers in fallback order. */
+export function defaultTerminalInvocations(
   workspacePath: string,
   platform = getDesktopPlatform(),
   env: NodeJS.ProcessEnv = process.env,
-): { command: string; args: string[]; cwd?: string } {
+): TerminalInvocation[] {
+  if (platform === 'windows') {
+    return [
+      { command: 'wt.exe', args: ['-d', workspacePath] },
+      { command: 'powershell.exe', args: ['-NoExit'], cwd: workspacePath },
+    ]
+  }
+  if (platform === 'linux')
+    return [{ command: 'x-terminal-emulator', args: [], cwd: workspacePath }]
+
   const wslDistribution = getWslDistributionName(env)
-  return platform === 'wsl'
-    ? {
-      command: 'wt.exe',
-      args: [
-        'nt',
-        '--',
-        'wsl.exe',
-        ...(wslDistribution ? ['-d', wslDistribution] : []),
-        '--cd',
-        workspacePath,
-      ],
-    }
-    : { command: 'x-terminal-emulator', args: [], cwd: workspacePath }
+  return [{
+    command: 'wt.exe',
+    args: [
+      'nt',
+      '--',
+      'wsl.exe',
+      ...(wslDistribution ? ['-d', wslDistribution] : []),
+      '--cd',
+      workspacePath,
+    ],
+  }]
 }
 
 /**
@@ -112,25 +128,33 @@ export function openTerminalApplication(
   platform?: DesktopPlatform,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    let invocation: { command: string; args: string[]; cwd?: string }
+    let invocations: TerminalInvocation[]
     try {
-      invocation = template && template.trim()
-        ? { ...parseTerminalTemplate(template, workspacePath) }
-        : defaultTerminalInvocation(workspacePath, platform ?? getDesktopPlatform())
+      invocations = template && template.trim()
+        ? [{ ...parseTerminalTemplate(template, workspacePath) }]
+        : defaultTerminalInvocations(workspacePath, platform ?? getDesktopPlatform())
     } catch (error) {
       reject(error)
       return
     }
 
-    const child = spawn(invocation.command, invocation.args, {
-      cwd: invocation.cwd,
-      detached: true,
-      stdio: 'ignore',
-    })
-    child.once('error', reject)
-    child.once('spawn', () => {
-      child.unref()
-      resolve()
-    })
+    function launch(index: number): void {
+      const invocation = invocations[index]
+      const child = spawn(invocation.command, invocation.args, {
+        cwd: invocation.cwd,
+        detached: true,
+        stdio: 'ignore',
+      })
+      child.once('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT' && index + 1 < invocations.length) launch(index + 1)
+        else reject(error)
+      })
+      child.once('spawn', () => {
+        child.unref()
+        resolve()
+      })
+    }
+
+    launch(0)
   })
 }

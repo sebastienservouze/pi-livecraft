@@ -228,7 +228,10 @@ test('discards only the selected file, including renamed and untracked files', a
     await discardFileChanges(directory, 'first.ts')
     let snapshot = await getGitSnapshot(directory)
     assert.deepEqual(snapshot.files.map(({ path }) => path), ['second.ts', 'new.ts'])
-    assert.equal(await readFile(join(directory, 'first.ts'), 'utf8'), 'first\n')
+    assert.equal(
+      (await readFile(join(directory, 'first.ts'), 'utf8')).replaceAll('\r\n', '\n'),
+      'first\n',
+    )
 
     await discardFileChanges(directory, 'new.ts')
     await execFile('git', ['checkout', '--', 'second.ts'], { cwd: directory })
@@ -236,7 +239,10 @@ test('discards only the selected file, including renamed and untracked files', a
     await discardFileChanges(directory, 'renamed.ts')
     snapshot = await getGitSnapshot(directory)
     assert.equal(snapshot.files.length, 0)
-    assert.equal(await readFile(join(directory, 'second.ts'), 'utf8'), 'second\n')
+    assert.equal(
+      (await readFile(join(directory, 'second.ts'), 'utf8')).replaceAll('\r\n', '\n'),
+      'second\n',
+    )
   } finally {
     await rm(directory, { force: true, recursive: true })
   }

@@ -6,10 +6,11 @@ import {
   getWslDistributionName,
 } from '../server/system-integration.ts'
 
-test('detects Linux and WSL from the runtime environment', () => {
+test('detects Linux, WSL, and Windows from the runtime environment', () => {
   assert.equal(getDesktopPlatform('linux', {}), 'linux')
   assert.equal(getDesktopPlatform('linux', { WSL_DISTRO_NAME: 'Ubuntu' }), 'wsl')
-  assert.throws(() => getDesktopPlatform('win32', {}), /Unsupported platform: win32/)
+  assert.equal(getDesktopPlatform('win32', {}), 'windows')
+  assert.throws(() => getDesktopPlatform('darwin', {}), /Unsupported platform: darwin/)
 })
 
 test('reads the current WSL distribution name when available', () => {
@@ -17,8 +18,12 @@ test('reads the current WSL distribution name when available', () => {
   assert.equal(getWslDistributionName({ WSL_INTEROP: '/run/WSL/1_interop' }), undefined)
 })
 
-test('keeps Linux workspace paths unchanged', async () => {
+test('keeps native workspace paths unchanged', async () => {
   assert.equal(await externalWorkspacePath('/home/user/project', 'linux'), '/home/user/project')
+  assert.equal(
+    await externalWorkspacePath('C:\\Users\\user\\project', 'windows'),
+    'C:\\Users\\user\\project',
+  )
 })
 
 test('converts WSL workspace paths through the injected converter', async () => {

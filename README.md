@@ -58,7 +58,7 @@ All documentation in the project (except this README) is primarily meant to be r
 
 ## Quick start
 
-You need **Node.js 24+**, **npm**, and a configured **Pi**. Linux and WSL are supported.
+You need **Node.js 24+**, **npm**, and a configured **Pi**. Native Windows, Linux, and WSL are supported. On Windows, Pi itself requires Bash; Git for Windows is the simplest source, or configure `shellPath` in `~/.pi/agent/settings.json`. A global npm installation should expose `pi.cmd` through `PATH`; Livecraft resolves its package entry point and never sends Pi arguments through `cmd.exe`.
 
 **[Fork the repository](https://github.com/sebastienservouze/pi-livecraft/fork)**, then run:
 
@@ -108,7 +108,7 @@ Open [http://127.0.0.1:5173](http://127.0.0.1:5173) and you should see Livecraft
 
 - **Provider quotas:** see OpenAI Codex and GitHub Copilot usage windows in one panel (I only use these, ahah. Feel free to add your provider.)
 
-- **Terminal:** open an external Linux or WSL terminal in the current workspace from the rail, palette, or a shortcut
+- **Terminal:** open an installed native Windows, Linux, or WSL terminal in the current workspace from the rail, palette, or a shortcut
 
 ### Shape the workbench
 
@@ -207,9 +207,10 @@ When these extensions are installed and configured in Pi, Livecraft already cont
 <details>
 <summary><strong>Troubleshooting</strong></summary>
 
-- `pi: command not found`: install Pi globally and verify that `pi --version` works in the shell used to start Livecraft.
+- `pi: command not found`: install Pi globally and verify that `pi --version` works in the shell used to start Livecraft. On native Windows, `where.exe pi.cmd` must find the npm launcher.
 - The manager or backend is unavailable: check ports `43120` and `43121`, or set `PI_LIVECRAFT_MANAGER_PORT` and `PI_LIVECRAFT_BACKEND_PORT`. After a manager crash, restart `npm run dev`; the supervisor intentionally does not relaunch it automatically.
 - A new session cannot answer: launch Pi once, configure a provider with `/login`, and verify that the `/agent` extension is available if your setup expects it.
+- Native Windows desktop actions unavailable: verify that Windows PowerShell is available. Terminal selection tries Windows Terminal, Alacritty, WezTerm, PowerShell 7, Windows PowerShell, then Command Prompt.
 - Linux desktop actions unavailable: install or expose `xdg-open` and `x-terminal-emulator` in `PATH`.
 - WSL desktop actions unavailable: verify that `explorer.exe`, `wslpath`, and `wt.exe` are available in the WSL `PATH`.
 

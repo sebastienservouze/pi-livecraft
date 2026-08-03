@@ -22,13 +22,14 @@ test('makes only matching Windows drive and UNC paths repository-relative', () =
     pathFromRepositoryRoot('\\\\server\\share\\repo\\src\\file.ts', '\\\\server\\share\\repo'),
     'src/file.ts',
   )
-  assert.equal(
-    pathFromRepositoryRoot('C:\\Repo\\file.ts', 'C:\\repo'),
-    'C:\\Repo\\file.ts',
-  )
+  assert.equal(pathFromRepositoryRoot('C:\\Repo\\file.ts', 'C:\\repo'), 'file.ts')
   assert.equal(
     pathFromRepositoryRoot('\\\\SERVER\\share\\repo\\file.ts', '\\\\server\\share\\repo'),
-    '\\\\SERVER\\share\\repo\\file.ts',
+    'file.ts',
+  )
+  assert.equal(
+    pathFromRepositoryRoot('//server/share/repo/src/file.ts', '//SERVER/share/repo'),
+    'src/file.ts',
   )
   assert.equal(pathFromRepositoryRoot('D:\\repo\\file.ts', 'C:\\repo'), 'D:\\repo\\file.ts')
   assert.equal(pathFromRepositoryRoot('/Repo/file.ts', '/repo'), '/Repo/file.ts')

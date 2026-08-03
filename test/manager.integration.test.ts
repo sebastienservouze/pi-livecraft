@@ -369,7 +369,12 @@ async function writeFakePi(directory: string, emitStartupEvent = false): Promise
 import readline from 'node:readline'
 const isolated = process.argv.includes('--no-session')
 const sessionPath = process.argv[process.argv.indexOf('--session') + 1]
-const expectedExtensions = ${JSON.stringify([join(process.cwd(), 'pi-extensions/quotas.ts')])}
+const expectedExtensions = ${
+    JSON.stringify([
+      join(process.cwd(), 'pi-extensions/ask-user-question.ts'),
+      join(process.cwd(), 'pi-extensions/quotas.ts'),
+    ])
+  }
 const extensionPaths = process.argv.flatMap((argument, index) =>
   argument === '--extension' ? [process.argv[index + 1]] : []
 )

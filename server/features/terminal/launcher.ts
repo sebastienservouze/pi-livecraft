@@ -19,12 +19,52 @@ export class TerminalTemplateError extends Error {
   }
 }
 
-/**
- * Tokenizes a command template without shell parsing. Windows path backslashes stay
- * literal; the legacy backslash-escaped quote form remains valid inside quoted text.
- * Outside quotes, backslashes escape only whitespace and a quote.
- */
-export function tokenizeTemplate(template: string): string[] {
+/** Tokenizes a command template without shell parsing for the selected desktop platform. */
+export function tokenizeTemplate(
+  template: string,
+  platform: DesktopPlatform = getDesktopPlatform(),
+): string[] {
+  return platform === 'windows'
+    ? tokenizeWindowsTemplate(template)
+    : tokenizeLegacyTemplate(template)
+}
+
+function tokenizeLegacyTemplate(template: string): string[] {
+  const tokens: string[] = []
+  let current = ''
+  let inQuote = false
+
+  for (let index = 0; index < template.length; index += 1) {
+    const ch = template[index]
+
+    if (ch === '\\' && index + 1 < template.length) {
+      current += template[index + 1]
+      index += 1
+      continue
+    }
+
+    if (ch === '"') {
+      inQuote = !inQuote
+      continue
+    }
+
+    if (ch === ' ' && !inQuote) {
+      if (current.length > 0) {
+        tokens.push(current)
+        current = ''
+      }
+      continue
+    }
+
+    current += ch
+  }
+
+  if (inQuote) throw new TerminalTemplateError('Unclosed double quote in terminal command')
+  if (current.length > 0) tokens.push(current)
+  return tokens
+}
+
+function tokenizeWindowsTemplate(template: string): string[] {
   const tokens: string[] = []
   let current = ''
   let inQuote = false
@@ -85,6 +125,7 @@ export function tokenizeTemplate(template: string): string[] {
 export function parseTerminalTemplate(
   raw: string,
   cwd: string,
+  platform: DesktopPlatform = getDesktopPlatform(),
 ): { command: string; args: string[] } {
   if (!raw || !raw.trim()) throw new TerminalTemplateError('Terminal command is empty')
   if (raw.length > maxTemplateLength)
@@ -92,7 +133,7 @@ export function parseTerminalTemplate(
   if (raw.includes('\0'))
     throw new TerminalTemplateError('Terminal command contains invalid characters')
 
-  const tokens = tokenizeTemplate(raw.trim())
+  const tokens = tokenizeTemplate(raw.trim(), platform)
   if (tokens.length === 0) throw new TerminalTemplateError('Terminal command produced no tokens')
   if (!raw.includes('{cwd}')) throw new TerminalTemplateError('Terminal command must contain {cwd}')
 
@@ -181,7 +222,7 @@ export async function openTerminalApplication(
   spawnProcess: SpawnProcess = spawn,
 ): Promise<void> {
   if (template && template.trim()) {
-    const invocation = parseTerminalTemplate(template, workspacePath)
+    const invocation = parseTerminalTemplate(template, workspacePath, platform)
     await spawnDetached(invocation, spawnProcess)
     return
   }

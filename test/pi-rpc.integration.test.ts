@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { JsonLineDecoder, encodeJsonLine } from '../server/jsonl.ts'
 import { resolvePiLauncher } from '../server/pi-launcher.ts'
@@ -7,7 +9,7 @@ import type { JsonObject } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
 
 test('exposes current Pi commands over RPC', { timeout: 60_000 }, async (t) => {
-  const launcher = await resolvePiLauncher()
+  const launcher = resolvePiLauncher()
   const pi = spawn(launcher.command, [
     ...launcher.argsPrefix,
     '--mode',
@@ -15,7 +17,7 @@ test('exposes current Pi commands over RPC', { timeout: 60_000 }, async (t) => {
     '--offline',
     '--no-session',
   ], {
-    cwd: process.cwd(),
+    cwd: join(homedir(), '.pi'),
     env: { ...process.env, PI_OFFLINE: '1' },
     stdio: ['pipe', 'pipe', 'pipe'],
   })

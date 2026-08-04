@@ -169,6 +169,16 @@ async function refreshSessionActivity(): Promise<boolean> {
       || !Number.isInteger(state.data.pendingMessageCount)
       || state.data.pendingMessageCount < 0
     ) throw new Error('Pi returned an invalid session state')
+    const model = state.data.model
+    if (isObject(model) && typeof model.provider === 'string' && typeof model.id === 'string') {
+      session.summary.model = {
+        provider: model.provider,
+        id: model.id,
+        name: typeof model.name === 'string' ? model.name : undefined,
+      }
+    }
+    if (typeof state.data.thinkingLevel === 'string')
+      session.summary.thinkingLevel = state.data.thinkingLevel
     const running = state.data.isStreaming || state.data.isCompacting
       || state.data.pendingMessageCount > 0
     session.summary.status = running ? 'running' : 'idle'

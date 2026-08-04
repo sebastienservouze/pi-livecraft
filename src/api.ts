@@ -79,6 +79,13 @@ export async function listDirectories(path: string): Promise<DirectoryListing> {
   return request<DirectoryListing>(`/api/directories?path=${encodeURIComponent(path)}`)
 }
 
+export async function pickDirectory(initialPath: string): Promise<{ path: string | null }> {
+  return request<{ path: string | null }>('/api/directories/pick', {
+    method: 'POST',
+    body: JSON.stringify({ path: initialPath }),
+  })
+}
+
 export async function listCapabilities(cwd: string): Promise<CapabilityInventory> {
   return request<CapabilityInventory>(`/api/capabilities?cwd=${encodeURIComponent(cwd)}`)
 }

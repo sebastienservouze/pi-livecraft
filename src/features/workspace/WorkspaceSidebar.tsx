@@ -7,12 +7,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { Tooltip } from '../../components/Tooltip.tsx'
-import type { SessionSummary } from '../../../shared/types.ts'
+import type { SessionModel, SessionSummary } from '../../../shared/types.ts'
 import { defaultWorkerName } from '../../../shared/session-names.ts'
-import { displayThreadTitle } from '../composer/prompt-title.ts'
+import { threadContextTitle } from '../composer/prompt-title.ts'
 import { sessionIndicator, type SessionIndicator } from './session-indicator.ts'
 import { SessionStatusIndicator } from './SessionStatusIndicator.tsx'
-import type { ProjectGroup, ProjectThread } from './sidebar-projects.ts'
+import { projectLabel, type ProjectGroup, type ProjectThread } from './sidebar-projects.ts'
 import { maxWorkspaceSidebarWidth, minWorkspaceSidebarWidth } from './workspace-sidebar.ts'
 
 interface WorkspaceSidebarProps {
@@ -24,15 +24,19 @@ interface WorkspaceSidebarProps {
   sessions: SessionSummary[]
   selectedId: string
   width: number
-  activeWorkspacePath: string
   archivedProjects: string[]
   onToggleCollapsed: () => void
   onChooseProject: () => void
   onCreateThread: (projectPath: string) => Promise<void>
   onActivateThread: (thread: ProjectThread) => Promise<void>
-  onTogglePin: (projectPath: string) => void
+  onReorderProject: (draggedPath: string, targetPath: string) => void
   onArchiveProject: (projectPath: string) => void
   onUnarchiveProject: (projectPath: string) => void
+  onTogglePinSession: (sessionKey: string) => void
+  onArchiveSession: (sessionKey: string) => void
+  onUnarchiveSession: (sessionKey: string) => void
+  collapsedProjects: string[]
+  onToggleCollapsedProject: (projectPath: string) => void
   onOpenProjectFolder: (projectPath: string) => void
   onOpenSettings: () => void
   onResize: (width: number) => void
@@ -49,15 +53,19 @@ export function WorkspaceSidebar({
   sessions,
   selectedId,
   width,
-  activeWorkspacePath,
   archivedProjects,
   onToggleCollapsed,
   onChooseProject,
   onCreateThread,
   onActivateThread,
-  onTogglePin,
+  onReorderProject,
   onArchiveProject,
   onUnarchiveProject,
+  onTogglePinSession,
+  onArchiveSession,
+  onUnarchiveSession,
+  collapsedProjects,
+  onToggleCollapsedProject,
   onOpenProjectFolder,
   onOpenSettings,
   onResize,
@@ -66,6 +74,14 @@ export function WorkspaceSidebar({
   const selectedThreadRef = useRef<HTMLButtonElement>(null)
   const totalThreads = useMemo(
     () => projects.reduce((count, project) => count + project.threads.length, 0),
+    [projects],
+  )
+  const visibleProjects = useMemo(
+    () => projects.filter((project) => project.threads.length > 0 || project.isActiveWorkspace),
+    [projects],
+  )
+  const archivedThreads = useMemo(
+    () => projects.flatMap((project) => project.archivedThreads ?? []),
     [projects],
   )
 
@@ -124,26 +140,28 @@ export function WorkspaceSidebar({
             π
           </button>
         </Tooltip>
-        <Tooltip label='New thread'>
-          <button
-            aria-label='New thread'
-            className='sidebar-rail-button'
-            onClick={() => void onCreateThread(activeWorkspacePath).catch(onError)}
-            type='button'
-          >
-            <PlusIcon />
-          </button>
-        </Tooltip>
-        <Tooltip label='Settings'>
-          <button
-            aria-label='Open settings'
-            className='sidebar-rail-button'
-            onClick={onOpenSettings}
-            type='button'
-          >
-            <SettingsIcon />
-          </button>
-        </Tooltip>
+        <div className='sidebar-rail-actions'>
+          <Tooltip label='Browse or add project'>
+            <button
+              aria-label='Browse or add project'
+              className='sidebar-rail-button'
+              onClick={onChooseProject}
+              type='button'
+            >
+              <WorkspaceIcon />
+            </button>
+          </Tooltip>
+          <Tooltip label='Settings'>
+            <button
+              aria-label='Open settings'
+              className='sidebar-rail-button'
+              onClick={onOpenSettings}
+              type='button'
+            >
+              <SettingsIcon />
+            </button>
+          </Tooltip>
+        </div>
       </aside>
     )
   }
@@ -178,6 +196,16 @@ export function WorkspaceSidebar({
           <strong>Pi Livecraft</strong>
           <small>Project sessions</small>
         </div>
+        <Tooltip label='Browse or add project'>
+          <button
+            aria-label='Browse or add project'
+            className='settings-button project-picker-button'
+            onClick={onChooseProject}
+            type='button'
+          >
+            <WorkspaceIcon />
+          </button>
+        </Tooltip>
         <Tooltip label='Settings'>
           <button
             aria-label='Open settings'
@@ -190,34 +218,11 @@ export function WorkspaceSidebar({
         </Tooltip>
       </div>
 
-      <div className='workspace-group'>
-        <Tooltip label={activeWorkspacePath}>
-          <button
-            aria-label={`Change project. Current: ${activeWorkspacePath}`}
-            className='workspace-path'
-            onClick={onChooseProject}
-            type='button'
-          >
-            <WorkspaceIcon />
-            <div className='workspace-path-copy'>
-              <span>Project</span>
-              <strong>{activeWorkspacePath}</strong>
-            </div>
-            <ChevronIcon />
-          </button>
-        </Tooltip>
-      </div>
-
-      <NewThreadButton
-        onCreate={() => onCreateThread(activeWorkspacePath)}
-        onError={onError}
-      />
-
       <div className='project-list' aria-label='Projects and their Pi sessions'>
         {isRefreshing && totalThreads === 0 && (
           <p className='session-list-loading' role='status'>Loading sessions…</p>
         )}
-        {projects.map((project) => (
+        {visibleProjects.map((project) => (
           <ProjectSection
             key={project.path}
             project={project}
@@ -226,18 +231,48 @@ export function WorkspaceSidebar({
             selectedThreadRef={selectedThreadRef}
             compactingSessionIds={compactingSessionIds}
             completedSessionIds={completedSessionIds}
+            isCollapsed={collapsedProjects.includes(project.path)}
+            onToggleCollapsed={onToggleCollapsedProject}
             onCreateThread={onCreateThread}
             onActivateThread={onActivateThread}
-            onTogglePin={onTogglePin}
+            onReorderProject={onReorderProject}
             onArchiveProject={onArchiveProject}
             onOpenProjectFolder={onOpenProjectFolder}
+            onTogglePinSession={onTogglePinSession}
+            onArchiveSession={onArchiveSession}
             onError={onError}
           />
         ))}
         {!isRefreshing && totalThreads === 0 && (
-          <p className='empty-sidebar'>No Pi sessions yet. Start a new thread above.</p>
+          <p className='empty-sidebar'>
+            {visibleProjects.length === 0
+              ? 'No projects yet. Add a project to get started.'
+              : 'No sessions yet. Use ＋ on a project to start its first thread.'}
+          </p>
         )}
       </div>
+
+      {archivedThreads.length > 0 && (
+        <details className='archived-projects'>
+          <summary>Archived sessions ({archivedThreads.length})</summary>
+          <ul>
+            {archivedThreads.map((thread) => (
+              <li key={thread.key}>
+                <span className='archived-project-path' title={thread.name}>
+                  {threadContextTitle(thread.name, thread.worker)} · {projectLabel(thread.cwd)}
+                </span>
+                <button
+                  aria-label={`Restore session ${thread.name}`}
+                  onClick={() => onUnarchiveSession(thread.key)}
+                  type='button'
+                >
+                  Restore
+                </button>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {archivedProjects.length > 0 && (
         <details className='archived-projects'>
@@ -245,7 +280,7 @@ export function WorkspaceSidebar({
           <ul>
             {archivedProjects.map((path) => (
               <li key={path}>
-                <span className='archived-project-path' title={path}>{path}</span>
+                <span className='archived-project-path' title={path}>{projectLabel(path)}</span>
                 <button
                   aria-label={`Restore archived project ${path}`}
                   onClick={() => onUnarchiveProject(path)}
@@ -269,11 +304,15 @@ interface ProjectSectionProps {
   selectedThreadRef: React.RefObject<HTMLButtonElement | null>
   compactingSessionIds: ReadonlySet<string>
   completedSessionIds: ReadonlySet<string>
+  isCollapsed: boolean
+  onToggleCollapsed: (projectPath: string) => void
   onCreateThread: (projectPath: string) => Promise<void>
   onActivateThread: (thread: ProjectThread) => Promise<void>
-  onTogglePin: (projectPath: string) => void
+  onReorderProject: (draggedPath: string, targetPath: string) => void
   onArchiveProject: (projectPath: string) => void
   onOpenProjectFolder: (projectPath: string) => void
+  onTogglePinSession: (sessionKey: string) => void
+  onArchiveSession: (sessionKey: string) => void
   onError: (cause: unknown) => void
 }
 
@@ -287,127 +326,143 @@ function ProjectSection({
   completedSessionIds,
   onCreateThread,
   onActivateThread,
-  onTogglePin,
+  onReorderProject,
   onArchiveProject,
   onOpenProjectFolder,
+  onTogglePinSession,
+  onArchiveSession,
+  isCollapsed,
+  onToggleCollapsed,
   onError,
 }: ProjectSectionProps) {
-  const [overflowOpen, setOverflowOpen] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
   const summary = project.activeCount > 0
     ? `${project.threads.length} threads · ${project.activeCount} active`
     : `${project.threads.length} thread${project.threads.length === 1 ? '' : 's'}`
 
   return (
-    <section className='project-section' aria-label={`Project ${project.label}`}>
-      <div className='project-divider'>
-        <div className='project-divider-copy'>
-          <Tooltip label={project.path}>
+    <section
+      aria-label={`Project ${project.label}`}
+      className={`project-section${dragOver ? ' drag-over' : ''}`}
+      onDragLeave={() => setDragOver(false)}
+      onDragOver={(event) => {
+        if (!event.dataTransfer.types.includes(projectDragType)) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+        setDragOver(true)
+      }}
+      onDrop={(event) => {
+        setDragOver(false)
+        const draggedPath = event.dataTransfer.getData(projectDragType)
+        if (!draggedPath) return
+        event.preventDefault()
+        onReorderProject(draggedPath, project.path)
+      }}
+    >
+      <div
+        className='project-divider'
+        draggable
+        onDragStart={(event) => {
+          event.dataTransfer.setData(projectDragType, project.path)
+          event.dataTransfer.effectAllowed = 'move'
+        }}
+      >
+        <Tooltip label={project.path}>
+          <button
+            aria-expanded={!isCollapsed}
+            aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} project ${project.label}`}
+            className='project-divider-copy project-collapse-toggle'
+            onClick={() => onToggleCollapsed(project.path)}
+            type='button'
+          >
             <h2>
-              {project.pinned && <span aria-hidden='true' className='project-pin-mark'>📌</span>}
+              <span aria-hidden='true' className='project-collapse-chevron'>
+                <ChevronIcon />
+              </span>
               {project.label}
             </h2>
-          </Tooltip>
-          <small>{summary}</small>
-        </div>
-        <div className='project-actions'>
-          <Tooltip label={`New thread in ${project.label}`}>
-            <button
-              aria-label={`New thread in ${project.label}`}
-              className='project-action'
-              onClick={() => void onCreateThread(project.path).catch(onError)}
-              type='button'
-            >
-              <PlusIcon />
-            </button>
-          </Tooltip>
-          <Tooltip label={project.pinned ? 'Unpin project' : 'Pin project'}>
-            <button
-              aria-label={project.pinned ? `Unpin ${project.label}` : `Pin ${project.label}`}
-              aria-pressed={project.pinned}
-              className='project-action'
-              onClick={() => onTogglePin(project.path)}
-              type='button'
-            >
-              <PinIcon />
-            </button>
-          </Tooltip>
-          <Tooltip label={`Archive ${project.label}`}>
-            <button
-              aria-label={`Archive ${project.label}`}
-              className='project-action'
-              onClick={() => onArchiveProject(project.path)}
-              type='button'
-            >
-              <ArchiveIcon />
-            </button>
-          </Tooltip>
-          <div className='project-overflow'>
-            <button
-              aria-expanded={overflowOpen}
-              aria-haspopup='menu'
-              aria-label={`More actions for ${project.label}`}
-              className='project-action'
-              onClick={() => setOverflowOpen((open) => !open)}
-              onBlur={(event) => {
-                if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node))
-                  setOverflowOpen(false)
-              }}
-              type='button'
-            >
-              <OverflowIcon />
-            </button>
-            {overflowOpen && (
-              <div className='project-overflow-menu' role='menu'>
-                <button
-                  className='project-overflow-item'
-                  onClick={() => {
-                    setOverflowOpen(false)
-                    onOpenProjectFolder(project.path)
-                  }}
-                  role='menuitem'
-                  type='button'
-                >
-                  Open folder
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+            <small>{summary}</small>
+          </button>
+        </Tooltip>
+        <ProjectActions
+          project={project}
+          onCreateThread={onCreateThread}
+          onArchiveProject={onArchiveProject}
+          onOpenProjectFolder={onOpenProjectFolder}
+          onError={onError}
+        />
       </div>
 
-      <nav className='session-list project-threads' aria-label={`${project.label} sessions`}>
-        {project.threads.length === 0 && <p className='project-empty'>No threads yet.</p>}
-        {project.threads.map((thread) => {
-          const active = sessions.find((session) =>
-            (thread.sessionPath
-              ? session.sessionPath === thread.sessionPath
-              : session.id === thread.id) && session.status !== 'exited'
-          )
-          const indicator = sessionIndicator(
-            active,
-            selectedId,
-            compactingSessionIds,
-            completedSessionIds,
-          )
-          const isSelected = active?.id === selectedId
-          const worker = active?.activeAgent ?? thread.worker ?? defaultWorkerName
-          const title = displayThreadTitle(thread.name, worker)
-          return (
-            <ThreadItem
-              key={thread.key}
-              indicator={indicator}
-              isSelected={isSelected}
-              selectedThreadRef={isSelected ? selectedThreadRef : undefined}
-              thread={thread}
-              title={title}
-              onActivate={onActivateThread}
-              onError={onError}
-            />
-          )
-        })}
-      </nav>
+      {isCollapsed
+        ? null
+        : (
+          <nav className='session-list project-threads' aria-label={`${project.label} sessions`}>
+            {project.threads.length === 0 && <p className='project-empty'>No threads yet.</p>}
+            {project.threads.map((thread) => {
+              const active = sessions.find((session) =>
+                (thread.sessionPath
+                  ? session.sessionPath === thread.sessionPath
+                  : session.id === thread.id) && session.status !== 'exited'
+              )
+              const indicator = sessionIndicator(
+                active,
+                selectedId,
+                compactingSessionIds,
+                completedSessionIds,
+              )
+              const isSelected = active?.id === selectedId
+              const worker = active?.activeAgent ?? thread.worker
+              const title = threadContextTitle(thread.name, worker)
+              const meta = threadMeta(
+                worker,
+                active?.model ?? thread.model,
+                active?.thinkingLevel ?? thread.thinkingLevel,
+                active?.status,
+              )
+              return (
+                <ThreadItem
+                  key={thread.key}
+                  indicator={indicator}
+                  isSelected={isSelected}
+                  selectedThreadRef={isSelected ? selectedThreadRef : undefined}
+                  thread={thread}
+                  title={title}
+                  meta={meta}
+                  onActivate={onActivateThread}
+                  onTogglePinSession={onTogglePinSession}
+                  onArchiveSession={onArchiveSession}
+                  onError={onError}
+                />
+              )
+            })}
+          </nav>
+        )}
     </section>
   )
+}
+
+const projectDragType = 'application/x-pi-livecraft-project'
+
+const sessionStatusLabels: Record<string, string> = {
+  starting: 'Starting…',
+  running: 'Working',
+  idle: 'Idle',
+}
+
+/** One glanceable line of session identity: named agent (never the generic default), model, reasoning level, and live status. */
+function threadMeta(
+  worker: string | undefined,
+  model: SessionModel | undefined,
+  thinkingLevel: string | undefined,
+  status: string | undefined,
+): string {
+  const parts = [
+    worker !== defaultWorkerName ? worker : undefined,
+    model ? model.name ?? model.id : undefined,
+    thinkingLevel,
+    status ? sessionStatusLabels[status] : undefined,
+  ]
+  return parts.filter(Boolean).join(' · ')
 }
 
 interface ThreadItemProps {
@@ -416,64 +471,177 @@ interface ThreadItemProps {
   selectedThreadRef?: React.RefObject<HTMLButtonElement | null>
   thread: ProjectThread
   title: string
+  meta: string
   onActivate: (thread: ProjectThread) => Promise<void>
+  onTogglePinSession: (sessionKey: string) => void
+  onArchiveSession: (sessionKey: string) => void
   onError: (cause: unknown) => void
 }
 
 /** A single selectable thread; shows a transient opening state while a history thread resumes. */
 function ThreadItem(
-  { indicator, isSelected, selectedThreadRef, thread, title, onActivate, onError }: ThreadItemProps,
+  {
+    indicator,
+    isSelected,
+    selectedThreadRef,
+    thread,
+    title,
+    meta,
+    onActivate,
+    onTogglePinSession,
+    onArchiveSession,
+    onError,
+  }: ThreadItemProps,
 ) {
   const [opening, setOpening] = useState(false)
   return (
-    <Tooltip label={title}>
-      <button
-        className={`session-item${isSelected ? ' selected' : ''}${
-          indicator ? ` ${indicator}` : ''
-        }`}
-        disabled={opening}
-        onClick={() => {
-          setOpening(true)
-          void onActivate(thread).catch(onError).finally(() => setOpening(false))
-        }}
-        ref={selectedThreadRef}
-        type='button'
-      >
-        {indicator && <SessionStatusIndicator status={indicator} />}
-        <span>
-          <strong>{opening ? 'Opening…' : title}</strong>
-        </span>
-      </button>
-    </Tooltip>
+    <div className='session-row'>
+      <Tooltip label={title}>
+        <button
+          className={`session-item${isSelected ? ' selected' : ''}${
+            indicator ? ` ${indicator}` : ''
+          }`}
+          disabled={opening}
+          onClick={() => {
+            setOpening(true)
+            void onActivate(thread).catch(onError).finally(() => setOpening(false))
+          }}
+          ref={selectedThreadRef}
+          type='button'
+        >
+          {indicator && <SessionStatusIndicator status={indicator} />}
+          {thread.pinned && (
+            <span aria-hidden='true' className='session-pin-mark'>
+              <PinIcon />
+            </span>
+          )}
+          <span>
+            <strong>{opening ? 'Opening…' : title}</strong>
+            {meta && <small className='session-meta'>{meta}</small>}
+          </span>
+        </button>
+      </Tooltip>
+      <SessionActions
+        thread={thread}
+        title={title}
+        onTogglePin={onTogglePinSession}
+        onArchive={onArchiveSession}
+      />
+    </div>
   )
 }
 
-/** Prevents duplicate thread creation and reports errors to the container. */
-function NewThreadButton(
-  { onCreate, onError }: { onCreate: () => Promise<void>; onError: (cause: unknown) => void },
-) {
-  const [busy, setBusy] = useState(false)
+interface ProjectActionsProps {
+  project: ProjectGroup
+  onCreateThread: (projectPath: string) => Promise<void>
+  onArchiveProject: (projectPath: string) => void
+  onOpenProjectFolder: (projectPath: string) => void
+  onError: (cause: unknown) => void
+}
 
-  async function create(): Promise<void> {
-    setBusy(true)
-    try {
-      await onCreate()
-    } catch (cause) {
-      onError(cause)
-    } finally {
-      setBusy(false)
-    }
-  }
+function ProjectActions(
+  {
+    project,
+    onCreateThread,
+    onArchiveProject,
+    onOpenProjectFolder,
+    onError,
+  }: ProjectActionsProps,
+) {
+  const [overflowOpen, setOverflowOpen] = useState(false)
 
   return (
-    <button
-      className='new-session'
-      disabled={busy}
-      onClick={() => void create()}
-      type='button'
-    >
-      {busy ? 'Starting…' : '＋ New thread'}
-    </button>
+    <div className='project-actions'>
+      <Tooltip label={`New thread in ${project.label}`}>
+        <button
+          aria-label={`New thread in ${project.label}`}
+          className='project-action'
+          onClick={() => void onCreateThread(project.path).catch(onError)}
+          type='button'
+        >
+          <PlusIcon />
+        </button>
+      </Tooltip>
+      <Tooltip label={`Archive ${project.label}`}>
+        <button
+          aria-label={`Archive ${project.label}`}
+          className='project-action'
+          onClick={() => onArchiveProject(project.path)}
+          type='button'
+        >
+          <ArchiveIcon />
+        </button>
+      </Tooltip>
+      <div className='project-overflow'>
+        <button
+          aria-expanded={overflowOpen}
+          aria-haspopup='menu'
+          aria-label={`More actions for ${project.label}`}
+          className='project-action'
+          onClick={() => setOverflowOpen((open) => !open)}
+          onBlur={(event) => {
+            if (!event.currentTarget.parentElement?.contains(event.relatedTarget as Node))
+              setOverflowOpen(false)
+          }}
+          type='button'
+        >
+          <OverflowIcon />
+        </button>
+        {overflowOpen && (
+          <div className='project-overflow-menu' role='menu'>
+            <button
+              className='project-overflow-item'
+              onClick={() => {
+                setOverflowOpen(false)
+                onOpenProjectFolder(project.path)
+              }}
+              role='menuitem'
+              type='button'
+            >
+              Open folder
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SessionActions({
+  thread,
+  title,
+  onTogglePin,
+  onArchive,
+}: {
+  thread: ProjectThread
+  title: string
+  onTogglePin: (sessionKey: string) => void
+  onArchive: (sessionKey: string) => void
+}) {
+  return (
+    <div className='project-actions session-actions'>
+      <Tooltip label={thread.pinned ? 'Unpin session' : 'Pin session'}>
+        <button
+          aria-label={thread.pinned ? `Unpin session ${title}` : `Pin session ${title}`}
+          aria-pressed={thread.pinned}
+          className='project-action'
+          onClick={() => onTogglePin(thread.key)}
+          type='button'
+        >
+          <PinIcon />
+        </button>
+      </Tooltip>
+      <Tooltip label='Archive session'>
+        <button
+          aria-label={`Archive session ${title}`}
+          className='project-action'
+          onClick={() => onArchive(thread.key)}
+          type='button'
+        >
+          <ArchiveIcon />
+        </button>
+      </Tooltip>
+    </div>
   )
 }
 
@@ -491,24 +659,6 @@ function WorkspaceIcon() {
       width='16'
     >
       <path d='M3.5 6.5A1.5 1.5 0 0 1 5 5h4l2 2h8A1.5 1.5 0 0 1 20.5 8.5v9A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-11Z' />
-    </svg>
-  )
-}
-
-function ChevronIcon() {
-  return (
-    <svg
-      aria-hidden='true'
-      fill='none'
-      height='14'
-      stroke='currentColor'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-      strokeWidth='1.75'
-      viewBox='0 0 24 24'
-      width='14'
-    >
-      <path d='m9 6 6 6-6 6' />
     </svg>
   )
 }
@@ -546,6 +696,24 @@ function PlusIcon() {
       width='16'
     >
       <path d='M12 5v14M5 12h14' />
+    </svg>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg
+      aria-hidden='true'
+      fill='none'
+      height='11'
+      stroke='currentColor'
+      strokeLinecap='round'
+      strokeLinejoin='round'
+      strokeWidth='1.6'
+      viewBox='0 0 12 12'
+      width='11'
+    >
+      <path d='M4 2.5 8 6l-4 3.5' />
     </svg>
   )
 }

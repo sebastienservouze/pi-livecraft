@@ -31,7 +31,7 @@ import {
 } from './workspace-file.ts'
 import { activeSessionMessages, LiveSessionEvents } from './session-snapshot.ts'
 import { loadPromptTemplates, savePromptTemplate } from './prompt-templates.ts'
-import { externalWorkspacePath, openPath } from './system-integration.ts'
+import { chooseDirectory, externalWorkspacePath, openPath } from './system-integration.ts'
 import { expandHomePath } from './home-path.ts'
 import type {
   DirectoryListing,
@@ -179,6 +179,20 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
 
   if (method === 'GET' && url.pathname === '/api/directories') {
     sendJson(response, 200, await listDirectories(url.searchParams.get('path') ?? '~/.pi'))
+    return
+  }
+
+  if (method === 'POST' && url.pathname === '/api/directories/pick') {
+    const body = await readJsonBody(request)
+    const initialPath = await resolveWorkingDirectory(
+      typeof body.path === 'string' ? body.path : '~',
+    )
+    const selectedPath = await chooseDirectory(initialPath)
+    sendJson(
+      response,
+      200,
+      { path: selectedPath ? await resolveWorkingDirectory(selectedPath) : null },
+    )
     return
   }
 

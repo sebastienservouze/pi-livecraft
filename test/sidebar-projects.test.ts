@@ -23,7 +23,6 @@ const live = (over: Partial<SessionSummary>): SessionSummary => ({
 })
 
 const base = {
-  pinnedProjects: [] as string[],
   archivedProjects: [] as string[],
 }
 
@@ -56,16 +55,15 @@ test('always shows the active workspace even when it has no threads', () => {
   assert.equal(groups[0].threads.length, 0)
 })
 
-test('pinned projects lead and are marked, surviving refresh order', () => {
+test('a dragged project order leads, unordered projects follow default order', () => {
   const groups = groupProjects({
     recentSessions: [recent({ updatedAt: 10 })],
     sessions: [live({ cwd: '/Users/dev/beta' })],
     activeWorkspacePath: '/Users/dev/alpha',
-    pinnedProjects: ['/Users/dev/beta'],
+    projectOrder: ['/Users/dev/beta'],
     archivedProjects: [],
   })
-  assert.equal(groups[0].path, '/Users/dev/beta')
-  assert.equal(groups[0].pinned, true)
+  assert.deepEqual(groups.map((group) => group.path), ['/Users/dev/beta', '/Users/dev/alpha'])
 })
 
 test('archived projects are hidden from the grouping', () => {
@@ -73,7 +71,6 @@ test('archived projects are hidden from the grouping', () => {
     recentSessions: [recent({})],
     sessions: [live({})],
     activeWorkspacePath: '/Users/dev/alpha',
-    pinnedProjects: [],
     archivedProjects: ['/Users/dev/beta'],
   })
   assert.deepEqual(groups.map((group) => group.path), ['/Users/dev/alpha'])
@@ -97,6 +94,25 @@ test('orders threads with live sessions first, then by recency', () => {
   ])
 })
 
+test('pins and archives session rows independently from their project', () => {
+  const groups = groupProjects({
+    recentSessions: [
+      recent({ sessionPath: '/sessions/pinned.jsonl', updatedAt: 10 }),
+      recent({ sessionPath: '/sessions/archived.jsonl', updatedAt: 20 }),
+    ],
+    sessions: [],
+    activeWorkspacePath: '/Users/dev/alpha',
+    archivedProjects: [],
+    pinnedSessions: ['/sessions/pinned.jsonl'],
+    archivedSessions: ['/sessions/archived.jsonl'],
+  })
+  const alpha = groups.find((group) => group.path === '/Users/dev/alpha')
+  assert.equal(alpha?.threads[0]?.pinned, true)
+  assert.deepEqual(alpha?.archivedThreads.map((thread) => thread.key), [
+    '/sessions/archived.jsonl',
+  ])
+})
+
 test('excludes exited managed sessions from live threads', () => {
   const groups = groupProjects({
     recentSessions: [],
@@ -105,4 +121,24 @@ test('excludes exited managed sessions from live threads', () => {
     ...base,
   })
   assert.deepEqual(groups.map((group) => group.path), ['/Users/dev/alpha'])
+})
+
+test('carries session model metadata onto threads from history and live sessions', () => {
+  const groups = groupProjects({
+    recentSessions: [recent({ model: { provider: 'zai', id: 'glm-5.2' }, thinkingLevel: 'high' })],
+    sessions: [
+      live({
+        activeAgent: 'Glim (glmpi)',
+        model: { provider: 'zai', id: 'glm-5.2', name: 'GLM-5.2' },
+      }),
+    ],
+    activeWorkspacePath: '/Users/dev/alpha',
+    ...base,
+  })
+  const alpha = groups.find((group) => group.path === '/Users/dev/alpha')
+  const beta = groups.find((group) => group.path === '/Users/dev/beta')
+  assert.deepEqual(alpha?.threads[0]?.model, { provider: 'zai', id: 'glm-5.2' })
+  assert.equal(beta?.threads[0]?.worker, 'Glim (glmpi)')
+  assert.equal(beta?.threads[0]?.model?.name, 'GLM-5.2')
+  assert.equal(alpha?.threads[0]?.thinkingLevel, 'high')
 })

@@ -55,8 +55,11 @@ import { DirectoryPicker } from './features/workspace/DirectoryPicker.tsx'
 import { sidebarSessions } from './features/workspace/sidebar-sessions.ts'
 import { groupProjects, type ProjectThread } from './features/workspace/sidebar-projects.ts'
 import {
+  archivedSessionsStorageKey,
   archivedProjectsStorageKey,
-  pinnedProjectsStorageKey,
+  collapsedProjectsStorageKey,
+  pinnedSessionsStorageKey,
+  projectOrderStorageKey,
   toggleProjectPath,
 } from './features/workspace/project-preferences.ts'
 import { useWorkspaceSessions } from './features/workspace/useWorkspaceSessions.ts'
@@ -158,11 +161,20 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
     readWorkspaceSidebarCollapsed(window.localStorage.getItem(workspaceSidebarCollapsedKey))
   )
-  const [pinnedProjects, setPinnedProjects] = useState<string[]>(() =>
-    readProjectPaths(pinnedProjectsStorageKey)
+  const [projectOrder, setProjectOrder] = useState<string[]>(() =>
+    readProjectPaths(projectOrderStorageKey)
   )
   const [archivedProjects, setArchivedProjects] = useState<string[]>(() =>
     readProjectPaths(archivedProjectsStorageKey)
+  )
+  const [pinnedSessions, setPinnedSessions] = useState<string[]>(() =>
+    readProjectPaths(pinnedSessionsStorageKey)
+  )
+  const [archivedSessions, setArchivedSessions] = useState<string[]>(() =>
+    readProjectPaths(archivedSessionsStorageKey)
+  )
+  const [collapsedProjects, setCollapsedProjects] = useState<string[]>(() =>
+    readProjectPaths(collapsedProjectsStorageKey)
   )
   const [gitSnapshot, setGitSnapshot] = useState<GitSnapshot | null>(null)
   const [quotas, setQuotas] = useState<QuotaSnapshot | null>(null)
@@ -383,10 +395,19 @@ function App() {
     })
   }, [])
 
-  const togglePinnedProject = useCallback((projectPath: string) => {
-    setPinnedProjects((current) => {
-      const next = toggleProjectPath(current, projectPath)
-      writeProjectPaths(pinnedProjectsStorageKey, next)
+  /** Drops the dragged project just before the target, materializing the currently rendered order. */
+  const reorderProject = useCallback((draggedPath: string, targetPath: string) => {
+    if (draggedPath === targetPath) return
+    setProjectOrder(() => {
+      const rendered = projectsRef.current.map((project) => project.path)
+      const without = rendered.filter((path) => path !== draggedPath)
+      const targetIndex = without.indexOf(targetPath)
+      const next = targetIndex === -1 ? [...without, draggedPath] : [
+        ...without.slice(0, targetIndex),
+        draggedPath,
+        ...without.slice(targetIndex),
+      ]
+      writeProjectPaths(projectOrderStorageKey, next)
       return next
     })
   }, [])
@@ -409,6 +430,44 @@ function App() {
     })
   }, [])
 
+  const toggleCollapsedProject = useCallback((projectPath: string) => {
+    setCollapsedProjects((current) => {
+      const next = toggleProjectPath(current, projectPath)
+      writeProjectPaths(collapsedProjectsStorageKey, next)
+      return next
+    })
+  }, [])
+
+  const togglePinnedSession = useCallback((sessionKey: string) => {
+    setPinnedSessions((current) => {
+      const next = toggleProjectPath(current, sessionKey)
+      writeProjectPaths(pinnedSessionsStorageKey, next)
+      return next
+    })
+  }, [])
+
+  const archiveSession = useCallback((sessionKey: string) => {
+    setArchivedSessions((current) => {
+      if (current.includes(sessionKey)) return current
+      const next = [...current, sessionKey]
+      writeProjectPaths(archivedSessionsStorageKey, next)
+      return next
+    })
+    const active = sessions.find((session) =>
+      session.id === sessionKey || session.sessionPath === sessionKey
+    )
+    if (active?.id === selectedId) setSelectedId('')
+  }, [selectedId, sessions, setSelectedId])
+
+  const unarchiveSession = useCallback((sessionKey: string) => {
+    setArchivedSessions((current) => {
+      if (!current.includes(sessionKey)) return current
+      const next = current.filter((key) => key !== sessionKey)
+      writeProjectPaths(archivedSessionsStorageKey, next)
+      return next
+    })
+  }, [])
+
   // Switching to a project always makes it visible again, so it can never stay archived while active.
   const selectProject = useCallback((path: string) => {
     unarchiveProject(path)
@@ -421,11 +480,26 @@ function App() {
         recentSessions: [...sentSessions, ...recentSessions],
         sessions,
         activeWorkspacePath: workspacePath,
-        pinnedProjects,
+        projectOrder,
         archivedProjects,
+        pinnedSessions,
+        archivedSessions,
       }),
-    [archivedProjects, pinnedProjects, recentSessions, sentSessions, sessions, workspacePath],
+    [
+      archivedProjects,
+      archivedSessions,
+      projectOrder,
+      pinnedSessions,
+      recentSessions,
+      sentSessions,
+      sessions,
+      workspacePath,
+    ],
   )
+  const projectsRef = useRef(projects)
+  useEffect(() => {
+    projectsRef.current = projects
+  }, [projects])
 
   /** Opens a live thread by selection or resumes a history thread, switching projects when needed. */
   const activateThread = useCallback(async (thread: ProjectThread): Promise<void> => {
@@ -1170,15 +1244,19 @@ function App() {
         sessions={sessions}
         selectedId={selectedId}
         width={workspaceSidebarWidth}
-        activeWorkspacePath={workspacePath}
         archivedProjects={archivedProjects}
         onToggleCollapsed={toggleSidebarCollapsed}
         onChooseProject={() => setDirectoryPickerOpen(true)}
         onCreateThread={createThreadInProject}
         onActivateThread={activateThread}
-        onTogglePin={togglePinnedProject}
+        onReorderProject={reorderProject}
         onArchiveProject={archiveProject}
         onUnarchiveProject={unarchiveProject}
+        onTogglePinSession={togglePinnedSession}
+        onArchiveSession={archiveSession}
+        onUnarchiveSession={unarchiveSession}
+        collapsedProjects={collapsedProjects}
+        onToggleCollapsedProject={toggleCollapsedProject}
         onOpenProjectFolder={openCapabilityFolder}
         onOpenSettings={() => setSettingsOpen(true)}
         onError={(cause) => showToast('error', messageOf(cause))}
@@ -1529,12 +1607,11 @@ function readTerminalCommand(): string {
   return stored && stored.trim() && stored.includes('{cwd}') ? stored : ''
 }
 
-/** Restores the last-selected right sidebar widget, falling back to git when not collapsed. */
+/** Restores the last-selected right sidebar widget; without a stored choice it stays collapsed so the session workflow leads. */
 function readActiveRightWidget(): RightWidget | null {
   const stored = window.localStorage.getItem('pi-livecraft.right-sidebar-widget')
   if (isRightWidget(stored)) return stored
-  if (stored === 'none') return null
-  return window.localStorage.getItem('pi-livecraft.git-sidebar-collapsed') === 'true' ? null : 'git'
+  return null
 }
 
 function isManagerRuntimeStatus(value: unknown): value is ManagerRuntimeStatus {

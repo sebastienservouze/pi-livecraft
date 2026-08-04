@@ -112,11 +112,24 @@ async function readPiSession(path: string, updatedAt: number): Promise<RecentSes
   let name: string | undefined
   let prompt: string | undefined
   let lastMessageAt: number | undefined
+  let model: RecentSession['model']
+  let thinkingLevel: string | undefined
   for (let index = 1; index < lines.length; index += 1) {
     const value = parseLine(lines[index])
     if (!value) continue
     if (value.type === 'session_info' && typeof value.name === 'string' && value.name.trim()) {
       name = value.name.trim()
+      continue
+    }
+    if (
+      value.type === 'model_change' && typeof value.provider === 'string'
+      && typeof value.modelId === 'string'
+    ) {
+      model = { provider: value.provider, id: value.modelId }
+      continue
+    }
+    if (value.type === 'thinking_level_change' && typeof value.thinkingLevel === 'string') {
+      thinkingLevel = value.thinkingLevel
       continue
     }
     if (value.type !== 'message') continue
@@ -139,6 +152,8 @@ async function readPiSession(path: string, updatedAt: number): Promise<RecentSes
     name: name || prompt || unnamedSessionName,
     sessionPath: canonicalPath,
     updatedAt: lastMessageAt ?? (Number.isNaN(createdAt) ? updatedAt : createdAt),
+    model,
+    thinkingLevel,
   }
 }
 

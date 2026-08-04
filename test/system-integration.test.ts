@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
 import test from 'node:test'
 import {
+  chooseDirectory,
   externalWorkspacePath,
   getDesktopPlatform,
   getWslDistributionName,
@@ -13,6 +15,34 @@ test('detects Linux and WSL from the runtime environment', () => {
   assert.equal(getDesktopPlatform('linux', {}), 'linux')
   assert.equal(getDesktopPlatform('linux', { WSL_DISTRO_NAME: 'Ubuntu' }), 'wsl')
   assert.equal(getDesktopPlatform('win32', {}), 'windows')
+  assert.equal(getDesktopPlatform('darwin', {}), 'macos')
+})
+
+test('opens the macOS native folder chooser and returns its selected path', async () => {
+  let call: { command: string; args: string[] } | undefined
+  const selectedPath = await chooseDirectory(
+    '/Users/Ada/Projects',
+    'macos',
+    ((command: string, args: string[], options: Parameters<typeof spawn>[2]) => {
+      void options
+      call = { command, args }
+      const child = new EventEmitter() as EventEmitter & {
+        stdout: PassThrough
+        stderr: PassThrough
+      }
+      child.stdout = new PassThrough()
+      child.stderr = new PassThrough()
+      queueMicrotask(() => {
+        child.stdout.end('/Users/Ada/Projects/livecraft\n')
+        child.emit('exit', 0)
+      })
+      return child as never
+    }) as never,
+  )
+  assert.equal(selectedPath, '/Users/Ada/Projects/livecraft')
+  assert.equal(call?.command, 'osascript')
+  assert.equal(call?.args[0], '-e')
+  assert.match(call?.args[1] ?? '', /choose folder/)
 })
 
 test('reads the current WSL distribution name when available', () => {

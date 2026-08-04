@@ -1,4 +1,8 @@
-import { defaultWorkerName, isGenericSessionName } from '../../../shared/session-names.ts'
+import {
+  defaultWorkerName,
+  isGenericSessionName,
+  unnamedSessionName,
+} from '../../../shared/session-names.ts'
 
 const maxSessionTitleLength = 90
 const separator = ' — '
@@ -31,4 +35,18 @@ export function displayThreadTitle(rawName: string | undefined, worker?: string)
   const selfPrefix = `${workerName}${separator}`
   if (context.startsWith(selfPrefix)) context = context.slice(selfPrefix.length).trim()
   return composeThreadTitle(workerName, context)
+}
+
+/**
+ * Thread title as plain context: worker prefixes (current worker or the generic default) are
+ * stripped and never re-composed — worker identity lives in the row's meta line instead.
+ */
+export function threadContextTitle(rawName: string | undefined, worker?: string): string {
+  const workerName = (worker ?? '').trim() || defaultWorkerName
+  let context = (rawName ?? '').trim()
+  for (const prefix of [`${workerName}${separator}`, `${defaultWorkerName}${separator}`]) {
+    if (context.startsWith(prefix)) context = context.slice(prefix.length).trim()
+  }
+  if (isGenericSessionName(context)) context = ''
+  return context || unnamedSessionName
 }

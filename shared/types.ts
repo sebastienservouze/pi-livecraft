@@ -1,11 +1,19 @@
 export type JsonObject = Record<string, unknown>
 
+export interface SessionModel {
+  provider: string
+  id: string
+  name?: string
+}
+
 export interface SessionSummary {
   id: string
   cwd: string
   name: string
   sessionPath?: string
   activeAgent?: string
+  model?: SessionModel
+  thinkingLevel?: string
   status: 'starting' | 'idle' | 'running' | 'exited'
   pendingUi: JsonObject[]
 }
@@ -16,6 +24,8 @@ export interface RecentSession {
   name: string
   sessionPath: string
   updatedAt: number
+  model?: SessionModel
+  thinkingLevel?: string
 }
 
 export interface DirectoryEntry {

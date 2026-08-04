@@ -97,7 +97,7 @@
   }
   .sidebar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
     padding: 12px 14px;
     border-right: 0;
@@ -109,51 +109,32 @@
     min-width: 0;
     margin-bottom: 0;
   }
-  .workspace-group {
+  /* Sessions keep the vertical desktop layout on mobile: full-width rows in a capped scroll area. */
+  .project-list {
     grid-row: 2;
     grid-column: 1 / -1;
-  }
-  .workspace-path {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .workspace-path span {
-    flex: 0 0 auto;
-  }
-  .workspace-path strong {
-    display: block;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .new-session {
-    grid-row: 1;
-    grid-column: 2;
-    align-self: center;
-    width: auto;
-    margin-bottom: 0;
-    padding-inline: 13px;
+    max-height: 38dvh;
+    overflow-y: auto;
   }
   .session-list {
     grid-row: 3;
     grid-column: 1 / -1;
-    display: flex;
-    flex-direction: row;
-    overflow-x: auto;
+    overflow-y: visible;
   }
   .other-workspace-sessions {
     grid-column: 1 / -1;
-    max-height: none;
+    max-height: 30dvh;
   }
-  .other-session-list {
-    flex-direction: row;
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-  .session-item {
-    min-width: 220px;
+  /* Touch has no hover: session actions stay fixed in the row, always visible. */
+  .session-row > .session-actions {
+    position: static;
+    transform: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    opacity: 1;
+    pointer-events: auto;
   }
   .workspace {
     flex: 1;
@@ -179,9 +160,6 @@
   }
   .brand small {
     display: none;
-  }
-  .new-session {
-    font-size: 12px;
   }
   .conversation {
     padding: 20px 12px;

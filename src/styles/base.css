@@ -129,27 +129,12 @@ button:disabled, select:disabled {
   --shadow-soft: 0 3px 10px rgb(0 0 0 / 18%);
 
   /* ── sidebar / workspace ── */
-  .sidebar-action:hover,
-  .sidebar-action:focus-visible {
-    background: color-mix(in srgb, var(--ink) 6%, transparent);
-  }
   .session-item:hover {
     background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
   .session-item.selected {
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   }
-  .new-session:not(:disabled) {
-    box-shadow:
-      0 2px 0 color-mix(in srgb, var(--accent-hover) 35%, black),
-      0 5px 10px rgb(0 0 0 / 18%);
-  }
-  .new-session:hover:not(:disabled) {
-    box-shadow:
-      0 1px 0 color-mix(in srgb, var(--accent-hover) 25%, black),
-      0 4px 8px rgb(0 0 0 / 20%);
-  }
-
   /* ── composer ── */
   .composer:focus-within {
     border-color: transparent;

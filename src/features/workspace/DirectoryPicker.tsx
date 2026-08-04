@@ -1,9 +1,18 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import { listDirectories } from '../../api.ts'
 import { directoryCompletionTarget } from './directory-completion.ts'
+import { projectLabel } from './sidebar-projects.ts'
 
 /**
- * Completes and validates a local path before changing the workspace.
+ * Explicit project/workspace picker: completes and validates a local path, and lists registered
+ * recent projects and local worktrees for selection. Project identity is always the canonical path
+ * returned by `listDirectories`, never the display label.
  *
  * Directory suggestions use a version counter: each keystroke increments
  * `completionVersionRef`, and only the latest request's result is applied.
@@ -48,7 +57,18 @@ export function DirectoryPicker({ initialPath, recentPaths, onClose, onError, on
       })
   }, [path])
 
-  const visibleRecentPaths = recentPaths.filter((recentPath) => recentPath !== initialPath)
+  const query = path.trim().toLowerCase()
+  const visibleRecentPaths = useMemo(
+    () =>
+      recentPaths
+        .filter((recentPath) => recentPath !== initialPath)
+        .filter((recentPath) =>
+          query.length === 0
+          || recentPath.toLowerCase().includes(query)
+          || projectLabel(recentPath).toLowerCase().includes(query)
+        ),
+    [initialPath, query, recentPaths],
+  )
 
   /** Verifies that the path is still accessible before adopting it as the workspace. */
   function selectDirectory(nextPath: string): void {
@@ -94,8 +114,15 @@ export function DirectoryPicker({ initialPath, recentPaths, onClose, onError, on
         className='modal directory-picker'
         role='dialog'
       >
-        <h2 id='directory-picker-title'>Choose a directory</h2>
-        <label className='directory-path-label' htmlFor='directory-path'>Directory path</label>
+        <h2 id='directory-picker-title'>Switch project</h2>
+        <div className='project-picker-current'>
+          <span>Current project</span>
+          <strong>{projectLabel(initialPath)}</strong>
+          <small>{initialPath}</small>
+        </div>
+        <label className='directory-path-label' htmlFor='directory-path'>
+          Project path or search
+        </label>
         <input
           aria-activedescendant={activeSuggestion >= 0
             ? `directory-suggestion-${activeSuggestion}`
@@ -142,17 +169,19 @@ export function DirectoryPicker({ initialPath, recentPaths, onClose, onError, on
           </div>
         )}
         {visibleRecentPaths.length > 0 && (
-          <section aria-label='Recent workspaces' className='recent-workspaces'>
-            <strong>Recent workspaces</strong>
+          <section aria-label='Projects' className='recent-workspaces'>
+            <strong>Projects</strong>
             <div>
               {visibleRecentPaths
                 .map((recentPath) => (
                   <button
+                    className='project-picker-option'
                     key={recentPath}
                     onClick={() => selectDirectory(recentPath)}
                     type='button'
                   >
-                    {recentPath}
+                    <span className='project-picker-option-label'>{projectLabel(recentPath)}</span>
+                    <span className='project-picker-option-path'>{recentPath}</span>
                   </button>
                 ))}
             </div>

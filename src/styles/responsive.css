@@ -69,6 +69,15 @@
   .app-shell.right-sidebar-collapsed {
     grid-template-columns: clamp(220px, 22.67vw, 272px) minmax(0, 1fr) 48px;
   }
+  .app-shell.sidebar-collapsed {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+  .app-shell.sidebar-collapsed.right-sidebar-visible {
+    grid-template-columns: 52px minmax(0, 1fr) clamp(288px, 29vw, 348px);
+  }
+  .app-shell.sidebar-collapsed.right-sidebar-collapsed {
+    grid-template-columns: 52px minmax(0, 1fr) 48px;
+  }
   .sidebar-resize-handle,
   .right-sidebar-resize-handle {
     display: none;

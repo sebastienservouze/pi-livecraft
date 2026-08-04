@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import type { RecentSession } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
+import { unnamedSessionName } from '../shared/session-names.ts'
 
 const sessionDirectory = resolvePiSessionDirectory(process.env, homedir())
 
@@ -135,7 +136,7 @@ async function readPiSession(path: string, updatedAt: number): Promise<RecentSes
   return {
     id: header.id,
     cwd,
-    name: name || prompt || 'New session',
+    name: name || prompt || unnamedSessionName,
     sessionPath: canonicalPath,
     updatedAt: lastMessageAt ?? (Number.isNaN(createdAt) ? updatedAt : createdAt),
   }

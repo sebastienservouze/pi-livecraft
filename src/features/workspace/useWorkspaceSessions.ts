@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { listDirectories, listRecentSessions, listSessions, sendPiCommand } from '../../api.ts'
 import type { JsonObject, RecentSession, SessionSummary } from '../../../shared/types.ts'
 import { promptSessionTitle } from '../composer/prompt-title.ts'
+import { unnamedSessionName } from '../../../shared/session-names.ts'
 import { recentWorkspaces } from './recent-workspaces.ts'
 import { pickSessionOnOpen, sidebarSessions } from './sidebar-sessions.ts'
 
@@ -115,7 +116,7 @@ export function useWorkspaceSessions(
         const previousName = sessionsRef.current.find((current) => current.id === session.id)?.name
         return recentName
           ? { ...session, name: recentName }
-          : previousName && previousName !== 'Nouvelle session'
+          : previousName && previousName !== unnamedSessionName
           ? { ...session, name: previousName }
           : session
       })

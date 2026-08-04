@@ -6,6 +6,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { ManagerClient } from './manager-client.ts'
 import { ManagerRuntimeMonitor } from './manager-runtime-monitor.ts'
 import { listRecentPiSessions, loadPiSession } from './pi-session-store.ts'
+import { discoverCapabilities } from './capabilities.ts'
 import {
   commitChanges,
   discardChanges,
@@ -167,6 +168,12 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   if (method === 'GET' && url.pathname === '/api/sessions/recent') {
     const cwd = await resolveWorkingDirectory(url.searchParams.get('cwd') ?? '~/.pi')
     sendJson(response, 200, await listRecentPiSessions(cwd))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/capabilities') {
+    const cwd = await resolveWorkingDirectory(url.searchParams.get('cwd') ?? '~/.pi')
+    sendJson(response, 200, await discoverCapabilities(cwd))
     return
   }
 

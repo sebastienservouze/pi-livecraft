@@ -1,5 +1,6 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import * as Select from '@radix-ui/react-select'
+import type { CapabilityEntry, CapabilityInventory } from '../../../shared/types.ts'
 import type { CommandDefinition, CommandId } from '../commands/command-registry.ts'
 import { shortcutFromEvent, shortcutConflicts } from '../commands/command-registry.ts'
 import {
@@ -25,7 +26,7 @@ const themeVariableLabels: Record<ThemeVariable, string> = {
 // ── Tab registry ───────────────────────────────────────────────────
 
 /** Identifies a settings tab. Extend this union when adding a new tab. */
-export type SettingsTabId = 'themes' | 'terminal' | 'shortcuts'
+export type SettingsTabId = 'themes' | 'terminal' | 'shortcuts' | 'skills' | 'extensions'
 
 /** Describes one tab in the settings modal. */
 export interface SettingsTabDefinition {
@@ -36,6 +37,8 @@ export interface SettingsTabDefinition {
 /** Ordered list of tabs rendered in the settings modal. */
 export const settingsTabs: SettingsTabDefinition[] = [
   { id: 'themes', label: 'Color themes' },
+  { id: 'skills', label: 'Skills' },
+  { id: 'extensions', label: 'Extensions' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'shortcuts', label: 'Shortcuts' },
 ]
@@ -48,6 +51,9 @@ interface SettingsPanelProps {
   terminalCommand: string
   themes: Theme[]
   activeThemeId: string
+  workspacePath: string
+  onLoadCapabilities: () => Promise<CapabilityInventory>
+  onOpenCapabilityFolder: (path: string) => void
   onChange: (id: CommandId, shortcut: string) => void
   onTerminalCommandChange: (value: string) => void
   onSelectTheme: (id: string) => void
@@ -317,6 +323,122 @@ function ShortcutsSettings(
   )
 }
 
+interface CapabilityListProps {
+  kind: 'skill' | 'extension'
+  entries: CapabilityEntry[]
+  surfaceError: string
+  loading: boolean
+  onRefresh: () => void
+  onOpenFolder: (path: string) => void
+}
+
+/** Renders one skill or extension entry with its scope, capabilities, and a safe open-folder action. */
+function CapabilityItem(
+  { entry, onOpenFolder }: { entry: CapabilityEntry; onOpenFolder: (path: string) => void },
+) {
+  return (
+    <li className='capability-item'>
+      <div className='capability-item-head'>
+        <strong>{entry.name}</strong>
+        <span className={`capability-badge ${entry.enabled ? 'enabled' : 'disabled'}`}>
+          {entry.enabled ? 'Enabled' : 'Disabled'}
+        </span>
+      </div>
+      {entry.description && <p className='capability-desc'>{entry.description}</p>}
+      <dl className='capability-meta'>
+        <div>
+          <dt>Scope</dt>
+          <dd>{entry.scope} · {entry.origin}</dd>
+        </div>
+        {entry.commands && entry.commands.length > 0 && (
+          <div>
+            <dt>Commands</dt>
+            <dd>{entry.commands.join(', ')}</dd>
+          </div>
+        )}
+        {typeof entry.toolCount === 'number' && (
+          <div>
+            <dt>Tools</dt>
+            <dd>{entry.toolCount}</dd>
+          </div>
+        )}
+        <div className='capability-path'>
+          <dt>Path</dt>
+          <dd>{entry.path}</dd>
+        </div>
+      </dl>
+      <button className='capability-open' onClick={() => onOpenFolder(entry.path)} type='button'>
+        Open folder
+      </button>
+    </li>
+  )
+}
+
+/** Lists installed Pi skills or extensions with truthful loading, error, and empty states. */
+function CapabilityList(
+  { kind, entries, surfaceError, loading, onRefresh, onOpenFolder }: CapabilityListProps,
+) {
+  const [search, setSearch] = useState('')
+  const query = search.trim().toLowerCase()
+  const filtered = entries.filter((entry) =>
+    query.length === 0
+    || entry.name.toLowerCase().includes(query)
+    || (entry.description ?? '').toLowerCase().includes(query)
+    || entry.scope.includes(query)
+  )
+  const noun = kind === 'skill' ? 'skills' : 'extensions'
+
+  function renderBody(): ReactNode {
+    if (surfaceError) {
+      return (
+        <p className='capability-error' role='alert'>
+          Could not read {noun}: {surfaceError}
+        </p>
+      )
+    }
+    if (loading && entries.length === 0) {
+      return <p className='capability-status' role='status'>Loading {noun}…</p>
+    }
+    if (filtered.length === 0) {
+      return (
+        <p className='capability-empty'>
+          {entries.length === 0 ? `No ${noun} installed.` : `No ${noun} match “${search}”.`}
+        </p>
+      )
+    }
+    return (
+      <ul className='capability-items'>
+        {filtered.map((entry) => (
+          <CapabilityItem
+            entry={entry}
+            key={`${entry.scope}:${entry.path}`}
+            onOpenFolder={onOpenFolder}
+          />
+        ))}
+      </ul>
+    )
+  }
+
+  return (
+    <section className='capability-settings'>
+      <div className='capability-toolbar'>
+        <input
+          aria-label={`Search ${noun}`}
+          className='capability-search'
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder={`Search ${noun}…`}
+          spellCheck={false}
+          value={search}
+        />
+        <button className='capability-refresh' disabled={loading} onClick={onRefresh} type='button'>
+          {loading ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
+      {renderBody()}
+    </section>
+  )
+}
+
 // ── Main panel ─────────────────────────────────────────────────────
 
 /** Configures local shortcuts, terminal behavior, and editable color themes. */
@@ -326,6 +448,9 @@ export function SettingsPanel({
   terminalCommand,
   themes,
   activeThemeId,
+  workspacePath,
+  onLoadCapabilities,
+  onOpenCapabilityFolder,
   onChange,
   onTerminalCommandChange,
   onSelectTheme,
@@ -340,6 +465,9 @@ export function SettingsPanel({
   const [activeTab, setActiveTab] = useState<SettingsTabId>('themes')
   const [capturing, setCapturing] = useState<CommandId | null>(null)
   const [themeName, setThemeName] = useState('')
+  const [inventory, setInventory] = useState<CapabilityInventory | null>(null)
+  const [capabilitiesLoading, setCapabilitiesLoading] = useState(false)
+  const [capabilitiesError, setCapabilitiesError] = useState('')
   const conflicts = shortcutConflicts(shortcuts)
   const activeTheme = themes.find((theme) => theme.id === activeThemeId) ?? themes[0]
   const editableTheme = Boolean(activeTheme)
@@ -347,6 +475,29 @@ export function SettingsPanel({
   useEffect(() => {
     setThemeName(activeTheme?.name ?? '')
   }, [activeTheme?.id, activeTheme?.name])
+
+  const loadCapabilities = useCallback(() => {
+    setCapabilitiesLoading(true)
+    setCapabilitiesError('')
+    onLoadCapabilities()
+      .then(setInventory)
+      .catch((cause) =>
+        setCapabilitiesError(cause instanceof Error ? cause.message : String(cause))
+      )
+      .finally(() => setCapabilitiesLoading(false))
+  }, [onLoadCapabilities])
+
+  // Reload the inventory when the picker points at a different project.
+  useEffect(() => {
+    setInventory(null)
+    setCapabilitiesError('')
+  }, [workspacePath])
+
+  const capabilitiesNeeded = activeTab === 'skills' || activeTab === 'extensions'
+  useEffect(() => {
+    if (capabilitiesNeeded && inventory === null && !capabilitiesLoading && !capabilitiesError)
+      loadCapabilities()
+  }, [capabilitiesNeeded, capabilitiesError, capabilitiesLoading, inventory, loadCapabilities])
 
   const commitThemeName = () => {
     if (activeTheme && themeName.trim() !== activeTheme.name)
@@ -398,6 +549,37 @@ export function SettingsPanel({
                 onUpdateThemeColor={onUpdateThemeColor}
                 themeName={themeName}
                 themes={themes}
+              />
+            </TabPanel>
+          )}
+          {activeTab === 'skills' && (
+            <TabPanel key='skills' id='settings-tab-skills' labelledBy='settings-tab-btn-skills'>
+              <CapabilityList
+                entries={inventory
+                  ?.skills ?? []}
+                kind='skill'
+                loading={capabilitiesLoading}
+                onOpenFolder={onOpenCapabilityFolder}
+                onRefresh={loadCapabilities}
+                surfaceError={capabilitiesError || inventory
+                  ?.skillsError
+                  || ''}
+              />
+            </TabPanel>
+          )}
+          {activeTab === 'extensions' && (
+            <TabPanel
+              key='extensions'
+              id='settings-tab-extensions'
+              labelledBy='settings-tab-btn-extensions'
+            >
+              <CapabilityList
+                entries={inventory?.extensions ?? []}
+                kind='extension'
+                loading={capabilitiesLoading}
+                onOpenFolder={onOpenCapabilityFolder}
+                onRefresh={loadCapabilities}
+                surfaceError={capabilitiesError || inventory?.extensionsError || ''}
               />
             </TabPanel>
           )}

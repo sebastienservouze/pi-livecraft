@@ -17,6 +17,7 @@ import {
 } from './prompt-improvement.ts'
 import { runIsolatedPrompt } from './run-isolated-prompt.ts'
 import { isObject } from '../shared/is-object.ts'
+import { unnamedSessionName } from '../shared/session-names.ts'
 import type {
   JsonObject,
   ManagerEvent,
@@ -184,7 +185,7 @@ async function createSession(request: ManagerRequest): Promise<SessionSummary> {
   const summary: SessionSummary = {
     id: randomUUID(),
     cwd,
-    name: 'Nouvelle session',
+    name: unnamedSessionName,
     status: 'starting',
     pendingUi: [],
   }
@@ -350,7 +351,7 @@ function handlePiEvent(sessionId: string, session: ManagedSession, event: JsonOb
   if (event.type === 'session_info_changed') {
     session.summary.name = typeof event.name === 'string' && event.name.trim()
       ? event.name.trim()
-      : 'Nouvelle session'
+      : unnamedSessionName
   }
   if (event.type === 'agent_start') session.summary.status = 'running'
   if (event.type === 'agent_settled') session.summary.status = 'idle'

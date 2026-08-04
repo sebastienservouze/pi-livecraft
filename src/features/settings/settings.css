@@ -424,3 +424,158 @@
     width: 100%;
   }
 }
+
+/* ── Skills & extensions inventory ──────────────────────────────────── */
+.capability-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.capability-toolbar {
+  display: flex;
+  gap: 8px;
+}
+.capability-search {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 8px 11px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-size: 13px;
+}
+.capability-search:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.capability-refresh {
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  padding: 8px 14px;
+  background: var(--surface-raised);
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+}
+.capability-refresh:hover:not(:disabled), .capability-refresh:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  outline: 0;
+}
+.capability-refresh:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.capability-status, .capability-empty {
+  padding: 18px 4px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+.capability-error {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
+  border-radius: 9px;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface-raised));
+  color: var(--danger);
+  font-size: 13px;
+}
+.capability-items {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.capability-item {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 12px 14px;
+  background: var(--surface-raised);
+}
+.capability-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.capability-item-head strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.capability-badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.capability-badge.enabled {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent-hover);
+}
+.capability-badge.disabled {
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+  color: var(--muted);
+}
+.capability-desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.capability-meta {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+.capability-meta > div {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+}
+.capability-meta dt {
+  flex: 0 0 66px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.capability-meta dd {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.capability-meta .capability-path dd {
+  font: 11px ui-monospace, monospace;
+  color: var(--muted);
+}
+.capability-open {
+  justify-self: start;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+}
+.capability-open:hover, .capability-open:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  outline: 0;
+}

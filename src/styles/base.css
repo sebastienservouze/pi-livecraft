@@ -102,6 +102,16 @@ button:disabled, select:disabled {
   grid-template-columns:
     var(--workspace-sidebar-width, 272px) minmax(0, 1fr) 48px;
 }
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr);
+}
+.app-shell.sidebar-collapsed.right-sidebar-visible {
+  grid-template-columns:
+    52px minmax(0, 1fr) calc(var(--right-sidebar-width, 300px) + 48px);
+}
+.app-shell.sidebar-collapsed.right-sidebar-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr) 48px;
+}
 
 .workspace {
   position: relative;

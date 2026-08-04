@@ -10,3 +10,9 @@ export function clampWorkspaceSidebarWidth(width: number): number {
 export function readWorkspaceSidebarWidth(value: string | null): number {
   return value === null ? defaultWorkspaceSidebarWidth : clampWorkspaceSidebarWidth(Number(value))
 }
+
+export const workspaceSidebarCollapsedKey = 'pi-livecraft.sidebar-collapsed'
+
+export function readWorkspaceSidebarCollapsed(value: string | null): boolean {
+  return value === 'true'
+}

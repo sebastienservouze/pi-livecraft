@@ -1,4 +1,5 @@
 import type {
+  CapabilityInventory,
   DirectoryListing,
   GitFileDiff,
   GitPushResult,
@@ -76,6 +77,10 @@ export async function listRecentSessions(cwd: string): Promise<RecentSession[]> 
 
 export async function listDirectories(path: string): Promise<DirectoryListing> {
   return request<DirectoryListing>(`/api/directories?path=${encodeURIComponent(path)}`)
+}
+
+export async function listCapabilities(cwd: string): Promise<CapabilityInventory> {
+  return request<CapabilityInventory>(`/api/capabilities?cwd=${encodeURIComponent(cwd)}`)
 }
 
 export async function openExplorer(cwd: string): Promise<void> {

@@ -228,6 +228,25 @@ export interface QuotaSnapshot {
   sessionRequired: boolean
 }
 
+export interface CapabilityEntry {
+  name: string
+  kind: 'skill' | 'extension'
+  scope: 'user' | 'project'
+  origin: string
+  path: string
+  description?: string
+  enabled: boolean
+  commands?: string[]
+  toolCount?: number
+}
+
+export interface CapabilityInventory {
+  skills: CapabilityEntry[]
+  extensions: CapabilityEntry[]
+  skillsError?: string
+  extensionsError?: string
+}
+
 export type QuotaProviderReport<T> =
   | { ok: true; data: T[] }
   | { ok: false; error: string }

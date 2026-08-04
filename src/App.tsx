@@ -8,6 +8,7 @@ import {
   getGitSnapshot,
   getQuotas,
   improvePrompt,
+  listCapabilities,
   openExplorer,
   openSession,
   openTerminal,
@@ -29,6 +30,7 @@ import type {
   SessionSummary,
 } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
+import { unnamedSessionName } from '../shared/session-names.ts'
 import { Composer } from './features/composer/Composer.tsx'
 import { ToastStack, type Toast } from './features/notifications/ToastStack.tsx'
 import { sessionActivity, type PiConnection } from './features/conversation/activity.ts'
@@ -51,11 +53,19 @@ import { RightSidebar } from './features/right-sidebar/RightSidebar.tsx'
 import { quotaProviderForModel } from './features/quotas/quota-display.ts'
 import { DirectoryPicker } from './features/workspace/DirectoryPicker.tsx'
 import { sidebarSessions } from './features/workspace/sidebar-sessions.ts'
+import { groupProjects, type ProjectThread } from './features/workspace/sidebar-projects.ts'
+import {
+  archivedProjectsStorageKey,
+  pinnedProjectsStorageKey,
+  toggleProjectPath,
+} from './features/workspace/project-preferences.ts'
 import { useWorkspaceSessions } from './features/workspace/useWorkspaceSessions.ts'
 import { WorkspaceSidebar } from './features/workspace/WorkspaceSidebar.tsx'
 import {
   clampWorkspaceSidebarWidth,
+  readWorkspaceSidebarCollapsed,
   readWorkspaceSidebarWidth,
+  workspaceSidebarCollapsedKey,
 } from './features/workspace/workspace-sidebar.ts'
 import { CommandPalette, type PaletteCommand } from './features/commands/CommandPalette.tsx'
 import {
@@ -144,6 +154,15 @@ function App() {
   // Workspace tools and sidebars
   const [workspaceSidebarWidth, setWorkspaceSidebarWidth] = useState(() =>
     readWorkspaceSidebarWidth(window.localStorage.getItem('pi-livecraft.workspace-sidebar-width'))
+  )
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    readWorkspaceSidebarCollapsed(window.localStorage.getItem(workspaceSidebarCollapsedKey))
+  )
+  const [pinnedProjects, setPinnedProjects] = useState<string[]>(() =>
+    readProjectPaths(pinnedProjectsStorageKey)
+  )
+  const [archivedProjects, setArchivedProjects] = useState<string[]>(() =>
+    readProjectPaths(archivedProjectsStorageKey)
   )
   const [gitSnapshot, setGitSnapshot] = useState<GitSnapshot | null>(null)
   const [quotas, setQuotas] = useState<QuotaSnapshot | null>(null)
@@ -356,6 +375,102 @@ function App() {
     setWorkspaceSidebarWidth(nextWidth)
   }, [])
 
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((current) => {
+      const next = !current
+      window.localStorage.setItem(workspaceSidebarCollapsedKey, String(next))
+      return next
+    })
+  }, [])
+
+  const togglePinnedProject = useCallback((projectPath: string) => {
+    setPinnedProjects((current) => {
+      const next = toggleProjectPath(current, projectPath)
+      writeProjectPaths(pinnedProjectsStorageKey, next)
+      return next
+    })
+  }, [])
+
+  const archiveProject = useCallback((projectPath: string) => {
+    setArchivedProjects((current) => {
+      if (current.includes(projectPath)) return current
+      const next = [...current, projectPath]
+      writeProjectPaths(archivedProjectsStorageKey, next)
+      return next
+    })
+  }, [])
+
+  const unarchiveProject = useCallback((projectPath: string) => {
+    setArchivedProjects((current) => {
+      if (!current.includes(projectPath)) return current
+      const next = current.filter((path) => path !== projectPath)
+      writeProjectPaths(archivedProjectsStorageKey, next)
+      return next
+    })
+  }, [])
+
+  // Switching to a project always makes it visible again, so it can never stay archived while active.
+  const selectProject = useCallback((path: string) => {
+    unarchiveProject(path)
+    selectWorkspace(path)
+  }, [selectWorkspace, unarchiveProject])
+
+  const projects = useMemo(
+    () =>
+      groupProjects({
+        recentSessions: [...sentSessions, ...recentSessions],
+        sessions,
+        activeWorkspacePath: workspacePath,
+        pinnedProjects,
+        archivedProjects,
+      }),
+    [archivedProjects, pinnedProjects, recentSessions, sentSessions, sessions, workspacePath],
+  )
+
+  /** Opens a live thread by selection or resumes a history thread, switching projects when needed. */
+  const activateThread = useCallback(async (thread: ProjectThread): Promise<void> => {
+    const active = sessions.find((session) =>
+      (thread.sessionPath
+        ? session.sessionPath === thread.sessionPath
+        : session.id === thread.id) && session.status !== 'exited'
+    )
+    if (active) {
+      if (active.cwd === workspacePath) {
+        setSelectedId(active.id)
+        return
+      }
+      unarchiveProject(active.cwd)
+      selectWorkspace(active.cwd, active.id)
+      return
+    }
+    if (!thread.sessionPath) return
+    const sessionPath = thread.sessionPath
+    if (thread.cwd !== workspacePath) {
+      unarchiveProject(thread.cwd)
+      selectWorkspace(thread.cwd)
+    }
+    await startWorkspaceSession(() => openSession(thread.cwd, sessionPath))
+  }, [
+    selectWorkspace,
+    sessions,
+    setSelectedId,
+    startWorkspaceSession,
+    unarchiveProject,
+    workspacePath,
+  ])
+
+  /** Creates a new thread in an explicit project, switching to it first when it is not active. */
+  const createThreadInProject = useCallback(async (projectPath: string): Promise<void> => {
+    if (projectPath !== workspacePath) selectProject(projectPath)
+    await startWorkspaceSession(() => createSession(projectPath))
+  }, [selectProject, startWorkspaceSession, workspacePath])
+
+  const loadCapabilities = useCallback(() => listCapabilities(workspacePath), [workspacePath])
+
+  const openCapabilityFolder = useCallback((path: string) => {
+    void openExplorer(path).catch((cause) => showToast('error', messageOf(cause)))
+  }, [showToast])
+
   const updateRightSidebarWidth = useCallback((width: number) => {
     const nextWidth = clampRightSidebarWidth(width)
     window.localStorage.setItem('pi-livecraft.right-sidebar-width', String(nextWidth))
@@ -525,7 +640,7 @@ function App() {
       if (event.type === 'session_info_changed') {
         const name = typeof event.name === 'string' && event.name.trim()
           ? event.name.trim()
-          : 'New session'
+          : unnamedSessionName
         renameSession(sessionId, name)
       }
       if (event.type === 'agent_start') updateSession(sessionId, { status: 'running' })
@@ -709,7 +824,7 @@ function App() {
       try {
         await sendPiCommand(selectedId, command)
         const sentSession = sessions.find((session) => session.id === selectedId)
-        const shouldNameSession = !isCommand && sentSession?.name === 'Nouvelle session'
+        const shouldNameSession = !isCommand && sentSession?.name === unnamedSessionName
           && !snapshot
             .messages
             .some((entry) => entry.role === 'user')
@@ -968,6 +1083,18 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [commandPaletteOpen, dialog, executeCommand, settingsOpen, shortcuts])
 
+  // Sidebar collapse toggle (⌘B / Ctrl+B), independent of the remappable command shortcuts.
+  useEffect(() => {
+    const handleToggleSidebar = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented || event.altKey || event.shiftKey) return
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'b') return
+      event.preventDefault()
+      toggleSidebarCollapsed()
+    }
+    window.addEventListener('keydown', handleToggleSidebar)
+    return () => window.removeEventListener('keydown', handleToggleSidebar)
+  }, [toggleSidebarCollapsed])
+
   /** Positions the conversation on the element chosen from session analysis. */
   const navigateToAnalysisTarget = useCallback((target: SessionAnalysisTarget): void => {
     if (target.kind === 'tool' || target.kind === 'turn') {
@@ -1028,33 +1155,33 @@ function App() {
     <div
       className={`app-shell ${
         rightPanelVisible ? 'right-sidebar-visible' : 'right-sidebar-collapsed'
-      }`}
+      }${sidebarCollapsed ? ' sidebar-collapsed' : ''}`}
       style={{
         '--right-sidebar-width': `${rightSidebarWidth}px`,
-        '--workspace-sidebar-width': `${workspaceSidebarWidth}px`,
+        '--workspace-sidebar-width': sidebarCollapsed ? '52px' : `${workspaceSidebarWidth}px`,
       } as CSSProperties}
     >
       <WorkspaceSidebar
+        collapsed={sidebarCollapsed}
         compactingSessionIds={compactingSessionIds}
         completedSessionIds={completedSessionIds}
         isRefreshing={isRefreshingSessions}
-        recentSessions={recentSessions}
-        sentSessions={sentSessions}
+        projects={projects}
         sessions={sessions}
         selectedId={selectedId}
         width={workspaceSidebarWidth}
-        workspacePath={workspacePath}
-        onChooseWorkspace={() => setDirectoryPickerOpen(true)}
-        onCreate={async () => {
-          await startAndSelectSession(() => createSession(workspacePath))
-        }}
-        onOpenSession={async (recentSession) => {
-          await startAndSelectSession(() => openSession(workspacePath, recentSession.sessionPath))
-        }}
-        onSelectOtherWorkspaceSession={(session) => selectWorkspace(session.cwd, session.id)}
-        onSelectSession={setSelectedId}
-        onError={(cause) => showToast('error', messageOf(cause))}
+        activeWorkspacePath={workspacePath}
+        archivedProjects={archivedProjects}
+        onToggleCollapsed={toggleSidebarCollapsed}
+        onChooseProject={() => setDirectoryPickerOpen(true)}
+        onCreateThread={createThreadInProject}
+        onActivateThread={activateThread}
+        onTogglePin={togglePinnedProject}
+        onArchiveProject={archiveProject}
+        onUnarchiveProject={unarchiveProject}
+        onOpenProjectFolder={openCapabilityFolder}
         onOpenSettings={() => setSettingsOpen(true)}
+        onError={(cause) => showToast('error', messageOf(cause))}
         onResize={updateWorkspaceSidebarWidth}
       />
 
@@ -1286,7 +1413,7 @@ function App() {
           recentPaths={recentWorkspacePaths}
           onClose={() => setDirectoryPickerOpen(false)}
           onError={(cause) => showToast('error', messageOf(cause))}
-          onSelect={selectWorkspace}
+          onSelect={selectProject}
         />
       )}
       {questionnaire && !questionnaireInComposer && (
@@ -1324,6 +1451,9 @@ function App() {
           terminalCommand={terminalCommand}
           themes={allThemes(themePreferences)}
           activeThemeId={activeTheme.id}
+          workspacePath={workspacePath}
+          onLoadCapabilities={loadCapabilities}
+          onOpenCapabilityFolder={openCapabilityFolder}
           onChange={(id, shortcut) => {
             const next = { ...shortcuts, [id]: shortcut }
             setShortcuts(next)
@@ -1370,6 +1500,27 @@ function readShortcuts(): Partial<Record<CommandId, string>> {
     >
   } catch {
     return defaultShortcuts
+  }
+}
+
+/** Reads a persisted list of canonical project paths, tolerating absent or corrupt storage. */
+function readProjectPaths(key: string): string[] {
+  try {
+    const value: unknown = JSON.parse(window.localStorage.getItem(key) ?? '[]')
+    return Array.isArray(value)
+      ? value.filter((path): path is string => typeof path === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+/** Persists a list of canonical project paths. */
+function writeProjectPaths(key: string, paths: readonly string[]): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify([...paths]))
+  } catch {
+    // localStorage may be unavailable
   }
 }
 

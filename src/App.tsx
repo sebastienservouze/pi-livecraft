@@ -86,6 +86,11 @@ import {
   type ThemeVariable,
 } from './features/settings/themes.ts'
 import {
+  persistBackendBaseUrl,
+  readBackendBaseUrl,
+  resetBackendBaseUrl,
+} from './features/settings/backend-connection.ts'
+import {
   analyzeSession,
   type SessionAnalysisTarget,
 } from './features/session-analysis/session-analysis.ts'
@@ -168,7 +173,15 @@ function App() {
 
   // Preferences and commands
   const [themePreferences, setThemePreferences] = useState(() => readThemePreferences())
+  const [themePreview, setThemePreview] = useState<
+    ReturnType<typeof resolveActiveTheme> | undefined
+  >(
+    undefined,
+  )
+  const [backendBaseUrl, setBackendBaseUrl] = useState(() => readBackendBaseUrl())
+  const appShellRef = useRef<HTMLDivElement>(null)
   const activeTheme = useMemo(() => resolveActiveTheme(themePreferences), [themePreferences])
+  const displayedTheme = themePreview ?? activeTheme
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
@@ -447,13 +460,14 @@ function App() {
   }, [themePreferences])
 
   useEffect(() => {
-    const root = document.documentElement
-    root.dataset.theme = activeTheme.mode
-    applyThemePalette(root, activeTheme.palette)
-    const shadows = shadowForMode(activeTheme.mode)
-    root.style.setProperty('--shadow', shadows.shadow)
-    root.style.setProperty('--shadow-soft', shadows['shadow-soft'])
-  }, [activeTheme])
+    const shell = appShellRef.current
+    if (!shell) return
+    shell.dataset.theme = displayedTheme.mode
+    applyThemePalette(shell, displayedTheme.palette)
+    const shadows = shadowForMode(displayedTheme.mode)
+    shell.style.setProperty('--shadow', shadows.shadow)
+    shell.style.setProperty('--shadow-soft', shadows['shadow-soft'])
+  }, [displayedTheme])
 
   // Dialogs
   /** Clears an answered request immediately, then reconciles all pending requests with the manager. */
@@ -1081,9 +1095,11 @@ function App() {
 
   return (
     <div
+      ref={appShellRef}
       className={`app-shell ${workspaceSidebarCollapsed ? 'workspace-sidebar-collapsed ' : ''}${
         rightPanelVisible ? 'right-sidebar-visible' : 'right-sidebar-collapsed'
       }`}
+      data-theme={displayedTheme.mode}
       style={{
         '--right-sidebar-width': `${rightSidebarWidth}px`,
         '--workspace-sidebar-width': `${workspaceSidebarWidth}px`,
@@ -1378,11 +1394,21 @@ function App() {
       )}
       {settingsOpen && (
         <SettingsPanel
+          backendBaseUrl={backendBaseUrl}
           definitions={commandDefinitions}
           shortcuts={shortcuts}
           terminalCommand={terminalCommand}
           themes={allThemes(themePreferences)}
           activeThemeId={activeTheme.id}
+          onBackendBaseUrlChange={(value) => {
+            const normalized = persistBackendBaseUrl(value)
+            setBackendBaseUrl(normalized)
+          }}
+          onBackendBaseUrlReset={() => {
+            resetBackendBaseUrl()
+            setBackendBaseUrl(readBackendBaseUrl())
+          }}
+          onPreviewTheme={setThemePreview}
           onChange={(id, shortcut) => {
             const next = { ...shortcuts, [id]: shortcut }
             setShortcuts(next)
@@ -1402,7 +1428,10 @@ function App() {
             setShortcuts(defaultShortcuts)
             window.localStorage.setItem('pi-livecraft.shortcuts', JSON.stringify(defaultShortcuts))
           }}
-          onClose={() => setSettingsOpen(false)}
+          onClose={() => {
+            setThemePreview(undefined)
+            setSettingsOpen(false)
+          }}
         />
       )}
     </div>

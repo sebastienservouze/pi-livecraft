@@ -1,4 +1,4 @@
-:root {
+.app-shell {
   /* ── 8 source colours (overridden by JS for custom themes) ── */
   --canvas: #fafafc;
   --surface: #ffffff;
@@ -37,9 +37,19 @@
   color-scheme: light;
   --shadow: 0 12px 30px rgb(0 0 0 / 7%);
   --shadow-soft: 0 4px 14px rgb(0 0 0 / 5%);
+
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  min-width: 320px;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--workspace-sidebar-width, 272px) minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--canvas);
+  color: var(--ink);
 }
 
-[data-theme="dark"] {
+.app-shell[data-theme="dark"] {
   --canvas: #171c1a;
   --surface: #1e2422;
   --ink: #dde3e0;
@@ -54,45 +64,50 @@
   color-scheme: dark;
 }
 
-* {
+.app-shell,
+.app-shell * {
   box-sizing: border-box;
   scrollbar-color: color-mix(in srgb, var(--accent) 30%, var(--surface))
     transparent;
   scrollbar-width: thin;
 }
-*::-webkit-scrollbar {
+.app-shell *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-*::-webkit-scrollbar-track, *::-webkit-scrollbar-corner {
+.app-shell *::-webkit-scrollbar-track,
+.app-shell *::-webkit-scrollbar-corner {
   background: transparent;
 }
-*::-webkit-scrollbar-thumb {
+.app-shell *::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 30%, var(--surface)) content-box;
 }
-*::-webkit-scrollbar-thumb:hover {
+.app-shell *::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted);
 }
-button, input, select, textarea {
+.app-shell button,
+.app-shell input,
+.app-shell select,
+.app-shell textarea {
   font: inherit;
 }
-button {
+.app-shell button {
   cursor: pointer;
 }
-button:disabled, select:disabled {
+.app-shell button:disabled,
+.app-shell select:disabled {
   cursor: not-allowed;
 }
-
-.app-shell {
-  display: grid;
-  grid-template-columns: var(--workspace-sidebar-width, 272px) minmax(0, 1fr);
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--canvas);
-  color: var(--ink);
+.app-shell button:focus-visible,
+.app-shell input:focus-visible,
+.app-shell select:focus-visible,
+.app-shell textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline-offset: 2px;
 }
+
 .app-shell.right-sidebar-visible {
   grid-template-columns:
     var(--workspace-sidebar-width, 272px) minmax(0, 1fr)
@@ -124,7 +139,7 @@ button:disabled, select:disabled {
 
 /* ── Dark mode overrides (colour values derived from palette variables) ── */
 
-[data-theme="dark"] {
+.app-shell[data-theme="dark"] {
   --shadow: 0 8px 24px rgb(0 0 0 / 24%);
   --shadow-soft: 0 3px 10px rgb(0 0 0 / 18%);
 

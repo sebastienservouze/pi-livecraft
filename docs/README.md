@@ -21,6 +21,7 @@ Pi Livecraft is documented in layers: begin with the system you want to build on
 - **Send a command to a Pi session or inspect its data:** [how to talk to Pi](/docs/HOW-TO-TALK-TO-PI.md), which explains how to locate the upstream RPC reference installed with Pi.
 - **Run an isolated one-shot prompt without touching the session:** [how to run an isolated prompt](/docs/HOW-TO-RUN-ISOLATED-PROMPT.md).
 - **Change code loaded into Pi:** [Pi extensions](/pi-extensions/README.md).
+- **Change Hermes dashboard packaging:** [dashboard manifest](/dashboard/manifest.json), [plugin entry](/src/plugin-entry.tsx), and [architecture](/docs/ARCHITECTURE.md).
 
 ## Implementation guides
 

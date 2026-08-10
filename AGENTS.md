@@ -50,6 +50,7 @@ For a bug, trace the common cause before protecting symptoms. For any extra tool
 ## Architecture and safety boundaries
 
 - The React frontend communicates with the backend only through `src/api.ts`.
+- The frontend ships as a Hermes web dashboard plugin (`dashboard/manifest.json`, `src/plugin-entry.tsx`, `dashboard/dist/`). Feature code must use the SDK React shims in `src/plugin/` rather than importing npm `react`/`react-dom` directly, and all CSS must stay scoped under `.app-shell`.
 - `src/App.tsx` orchestrates cross-cutting state. Area-specific rendering and logic belong in `src/features/<feature>/`.
 - Colocate feature CSS. Reserve `src/styles/` for global and responsive rules; `src/App.css` remains the ordered entry point.
 - `server/backend.ts` owns the HTTP API and SSE stream and may restart without interrupting Pi.

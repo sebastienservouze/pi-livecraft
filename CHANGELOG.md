@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Repackage Pi Livecraft as a Hermes web dashboard plugin instead of a standalone Vite SPA served by the backend.
+- Scope plugin CSS under `.app-shell` and talk to the Node backend over a configurable cross-origin base URL with CORS.
+
+### Removed
+
+- Standalone `index.html`, `src/main.tsx`, and backend static file serving for the old SPA build.
+
 ## [1.2.0] - 2026-08-07
 
 ### Added

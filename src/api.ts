@@ -16,6 +16,14 @@ import type {
   WorkspaceFile,
 } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
+import { resolveBackendBaseUrl } from './features/settings/backend-connection.ts'
+
+export { resolveBackendBaseUrl } from './features/settings/backend-connection.ts'
+
+function apiUrl(path: string): string {
+  const base = resolveBackendBaseUrl()
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`
+}
 
 const managerEventNames: readonly ManagerEvent['event'][] = [
   'session_created',
@@ -51,7 +59,7 @@ export function subscribeManagerEvents(
   onEvent: (event: ManagerEvent) => void,
   onError: () => void,
 ): () => void {
-  const source = new EventSource('/api/events')
+  const source = new EventSource(apiUrl('/api/events'))
   source.onmessage = ({ data }) => {
     const event = parseManagerEvent(data)
     if (event) onEvent(event)
@@ -283,7 +291,7 @@ export async function sendPiCommand(sessionId: string, command: JsonObject): Pro
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     ...init,
     headers: typeof init?.body === 'string'
       ? { 'Content-Type': 'application/json', ...init.headers }

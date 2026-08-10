@@ -24,9 +24,9 @@
   },
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others --kill-timeout 3000 --names manager,backend,frontend npm:dev:manager npm:dev:backend npm:dev:frontend",
+    "dev": "concurrently --kill-others --kill-timeout 3000 --names manager,backend,plugin npm:dev:manager npm:dev:backend npm:dev:plugin",
     "start": "npm run build && concurrently --kill-others --kill-timeout 3000 --names manager,backend npm:start:manager npm:start:backend",
-    "dev:frontend": "vite --host 127.0.0.1",
+    "dev:plugin": "vite build --watch",
     "dev:backend": "node --watch server/backend.ts",
     "dev:manager": "node server/manager-supervisor.ts",
     "start:backend": "node server/backend.ts",
@@ -38,14 +38,11 @@
     "lint": "oxlint .",
     "test": "node --test",
     "eval:documentation-routing": "node --test evals/documentation-routing.ts",
-    "preview": "vite preview --host 127.0.0.1",
     "prepare": "husky"
   },
   "dependencies": {
     "@radix-ui/react-select": "^2.3.3",
     "diff": "^8.0.4",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
@@ -63,6 +60,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.2.0",
     "oxlint": "^1.71.0",
+    "react": "^19.2.7",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   },

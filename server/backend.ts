@@ -1,8 +1,9 @@
-import { createReadStream } from 'node:fs'
 import { readdir, realpath, stat } from 'node:fs/promises'
-import { dirname, extname, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { dirname, resolve } from 'node:path'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { applyCorsHeaders, handleCorsPreflight, requestOrigin } from './cors.ts'
+
+const corsOrigins = new WeakMap<ServerResponse, string | undefined>()
 import { ManagerClient } from './manager-client.ts'
 import { ManagerRuntimeMonitor } from './manager-runtime-monitor.ts'
 import { listRecentPiSessions, loadPiSession } from './pi-session-store.ts'
@@ -47,7 +48,6 @@ const manager = new ManagerClient(host, managerPort)
 const eventClients = new Set<ServerResponse>()
 const liveSessionEvents = new Map<string, LiveSessionEvents>()
 let piEventSequence = 0
-const distDirectory = fileURLToPath(new URL('../dist/', import.meta.url))
 const quotas = new QuotaService(manager)
 const managerRuntime = new ManagerRuntimeMonitor(manager, (status) => {
   broadcast({ kind: 'event', event: 'manager_status', sessionId: '', data: status })
@@ -80,11 +80,16 @@ managerRuntime.start()
 manager.start()
 
 const server = createServer((request, response) => {
-  void route(request, response).catch((error) => {
-    const status = error instanceof HttpError ? error.status : 500
-    if (!response.headersSent) sendJson(response, status, { error: errorMessage(error) })
-    else response.end()
-  })
+  corsOrigins.set(response, requestOrigin(request))
+  void route(request, response)
+    .catch((error) => {
+      const status = error instanceof HttpError ? error.status : 500
+      if (!response.headersSent) sendJson(response, status, { error: errorMessage(error) })
+      else response.end()
+    })
+    .finally(() => {
+      corsOrigins.delete(response)
+    })
 })
 
 server.listen(port, host, () => {
@@ -93,6 +98,8 @@ server.listen(port, host, () => {
 
 /** Centralizes HTTP routing so validation and responses remain consistent across endpoints. */
 async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  if (handleCorsPreflight(request, response)) return
+  const origin = corsOrigins.get(response)
   const method = request.method ?? 'GET'
   const url = new URL(request.url ?? '/', `http://${host}`)
 
@@ -105,6 +112,7 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
   }
 
   if (method === 'GET' && url.pathname === '/api/events') {
+    applyCorsHeaders(response, origin)
     response.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
@@ -489,11 +497,6 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return
   }
 
-  if (method === 'GET' || method === 'HEAD') {
-    await serveStatic(url.pathname, method, response)
-    return
-  }
-
   sendJson(response, 404, { error: 'Not found' })
 }
 
@@ -559,30 +562,10 @@ async function readJsonBody(request: IncomingMessage): Promise<JsonObject> {
   }
 }
 
-/** Serves the frontend build while preventing an HTTP path from escaping the distribution directory. */
-async function serveStatic(
-  pathname: string,
-  method: string,
-  response: ServerResponse,
-): Promise<void> {
-  const requestedPath = pathname === '/' ? 'index.html' : pathname.slice(1)
-  let filePath = resolve(distDirectory, requestedPath)
-  if (!filePath.startsWith(`${resolve(distDirectory)}${sep}`)) throw new HttpError(404, 'Not found')
-
-  try {
-    if (!(await stat(filePath)).isFile()) throw new Error('Not a file')
-  } catch {
-    filePath = resolve(distDirectory, 'index.html')
-    try {
-      if (!(await stat(filePath)).isFile()) throw new Error('Missing build')
-    } catch {
-      throw new HttpError(404, 'Frontend build not found; run npm run build')
-    }
-  }
-
-  response.writeHead(200, { 'Content-Type': contentType(filePath) })
-  if (method === 'HEAD') response.end()
-  else createReadStream(filePath).pipe(response)
+function sendJson(response: ServerResponse, status: number, value: unknown): void {
+  applyCorsHeaders(response, corsOrigins.get(response))
+  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
+  response.end(JSON.stringify(value))
 }
 
 function broadcast(event: unknown): void {
@@ -590,22 +573,6 @@ function broadcast(event: unknown): void {
   for (const client of eventClients) client.write(frame)
 }
 
-function sendJson(response: ServerResponse, status: number, value: unknown): void {
-  response.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' })
-  response.end(JSON.stringify(value))
-}
-
-/** Maps a file extension to the MIME type served in the HTTP response. */
-function contentType(filePath: string): string {
-  const types: Record<string, string> = {
-    '.css': 'text/css; charset=utf-8',
-    '.html': 'text/html; charset=utf-8',
-    '.js': 'text/javascript; charset=utf-8',
-    '.json': 'application/json; charset=utf-8',
-    '.svg': 'image/svg+xml',
-  }
-  return types[extname(filePath)] ?? 'application/octet-stream'
-}
 function isModelBody(value: unknown): { provider: string; modelId: string } | undefined {
   if (!isObject(value) || typeof value.provider !== 'string' || typeof value.modelId !== 'string')
     return undefined

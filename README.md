@@ -48,17 +48,18 @@ What about displaying fully interactive HTML pages directly in the tool result b
 
 *Well, maybe Livecraft isn't for you then :3*
 
-**The whole point is that** the UI lives in this repository and is hot-reloaded by Vite while all Pi sessions stay alive, so the model can change it **while** you use it. When something in the interface is annoying, the usual loop is:
+**The whole point is that** the UI lives in this repository and can be rebuilt while Pi sessions stay alive, so the model can change it **while** you use it. When something in the interface is annoying, the usual loop is:
 
 1. Ask the model to change it
-2. Watch it happen live
-3. Use it from now on
+2. Rebuild the Hermes dashboard plugin bundle (`npm run dev:plugin` watches for you)
+3. Refresh the Hermes dashboard tab (or run `curl http://127.0.0.1:9119/api/dashboard/plugins/rescan`)
+4. Use it from now on
 
 All documentation in the project (except this README) is primarily meant to be read by agents (you can still read it, dw). Start with the [documentation index](/docs/README.md).
 
 ## Quick start
 
-You need **Node.js 24+**, **npm**, and a configured **Pi**. Native Windows, Linux, and WSL are supported. On Windows, Pi itself requires Bash; Git for Windows is the simplest source, or configure `shellPath` in `~/.pi/agent/settings.json`. A global npm installation should expose `pi.cmd` through `PATH`; Livecraft resolves its package entry point and never sends Pi arguments through `cmd.exe`.
+You need **Node.js 24+**, **npm**, a configured **Pi**, and **[Hermes Agent](https://hermes-agent.nousresearch.com/)** with the web dashboard (`hermes dashboard`). Native Windows, Linux, and WSL are supported. On Windows, Pi itself requires Bash; Git for Windows is the simplest source, or configure `shellPath` in `~/.pi/agent/settings.json`. A global npm installation should expose `pi.cmd` through `PATH`; Livecraft resolves its package entry point and never sends Pi arguments through `cmd.exe`.
 
 **[Fork the repository](https://github.com/sebastienservouze/pi-livecraft/fork)**, then run:
 
@@ -67,10 +68,14 @@ git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
 cd YOUR-REPOSITORY
 
 npm install
-npm run dev # this allows hot reloading
+npm run build
+ln -s "$(pwd)" ~/.hermes/plugins/pi-livecraft   # macOS/Linux; use a directory junction on Windows
+npm run dev
 ```
 
-To launch Livecraft from any directory, link this checkout once in each shell environment you use:
+`npm run dev` starts the Pi backend, manager, and a watch build of the Hermes dashboard plugin bundle. In another terminal, run `hermes dashboard`, open the **Pi Livecraft** tab, and keep the backend service running on `http://127.0.0.1:43121` (override with `PI_LIVECRAFT_BACKEND_PORT`).
+
+To launch the backend stack from any directory, link this checkout once in each shell environment you use:
 
 ```bash
 npm link
@@ -79,7 +84,7 @@ pi-livecraft
 
 WSL/Linux and native Windows have separate global npm paths: run `npm link` from a checkout visible to each environment. The command always runs this repository's `npm run dev`.
 
-Open [http://127.0.0.1:5173](http://127.0.0.1:5173) and you should see Livecraft.
+After changing frontend code, wait for the plugin rebuild to finish, then refresh the Hermes dashboard tab or call `curl http://127.0.0.1:9119/api/dashboard/plugins/rescan`.
 
 ## What is already in the box
 
@@ -173,28 +178,28 @@ The [documentation index](/docs/README.md) links the feature contracts, backend 
 
 Everything runs locally!
 
-The browser renders the application. A local backend handles Livecraft features and carries Pi's events back to the page.
+The **Hermes web dashboard** loads Pi Livecraft as a dashboard plugin tab. The plugin UI talks to a separate local Node backend over HTTP and SSE. That backend handles Livecraft features and carries Pi's events back to the tab.
 
-A **separate manager starts and owns the Pi processes**, so refreshing the browser or restarting the backend does not close them, because the manager lives outside the Vite hot reload domain.
+A **separate manager starts and owns the Pi processes**, so refreshing the Hermes dashboard tab or restarting the backend does not close them, because the manager lives outside the plugin bundle rebuild cycle.
 
 ```mermaid
 flowchart LR
-    subgraph Livecraft["Pi Livecraft"]
-        direction LR
-        Browser(["React browser"])
+    subgraph Hermes["Hermes dashboard"]
+        Plugin["dashboard/dist/index.js"]
+    end
+    subgraph Livecraft["Pi Livecraft services"]
         Backend["Local backend"]
         Manager["Pi process manager"]
         Supervisor["Manager supervisor"]
-
-        Browser <-->|"HTTP + SSE"| Backend
-        Backend <-->|"Local JSON Lines"| Manager
-        Supervisor -.->|"guarded lifecycle"| Manager
     end
 
+    Plugin <-->|"HTTP + SSE (CORS)"| Backend
+    Backend <-->|"Local JSON Lines"| Manager
+    Supervisor -.->|"guarded lifecycle"| Manager
     Manager <-->|"Pi public RPC"| Pi(["Pi<br/><code>pi --mode rpc</code>"])
 ```
 
-Vite can update the frontend while a session stays open. The backend can also restart without closing active Pi processes.
+Rebuilding the plugin bundle does not restart Pi sessions. The backend can also restart without closing active Pi processes.
 
 If manager code changes, Livecraft shows a persistent notice and waits. The manager is not replaced until you ask and Pi is idle. Sessions closed during the replacement remain available in history. That's the trick. Cool, right? :)
 

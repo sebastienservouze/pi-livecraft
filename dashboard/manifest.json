@@ -1,0 +1,13 @@
+{
+  "name": "pi-livecraft",
+  "label": "Pi Livecraft",
+  "description": "Visual Pi coding agent workbench with sessions, composer, Git, and workspace widgets.",
+  "icon": "Terminal",
+  "version": "1.2.0",
+  "tab": {
+    "path": "/pi-livecraft",
+    "position": "after:skills"
+  },
+  "entry": "dist/index.js",
+  "css": "dist/style.css"
+}

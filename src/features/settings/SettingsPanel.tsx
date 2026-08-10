@@ -2,14 +2,8 @@ import { type ReactNode, useEffect, useState } from 'react'
 import * as Select from '@radix-ui/react-select'
 import type { CommandDefinition, CommandId } from '../commands/command-registry.ts'
 import { shortcutFromEvent, shortcutConflicts } from '../commands/command-registry.ts'
-import {
-  applyThemePalette,
-  contrastColor,
-  shadowForMode,
-  THEME_VARIABLES,
-  type Theme,
-  type ThemeVariable,
-} from './themes.ts'
+import { contrastColor, THEME_VARIABLES, type Theme, type ThemeVariable } from './themes.ts'
+import { DEFAULT_BACKEND_BASE_URL } from './backend-connection.ts'
 
 const themeVariableLabels: Record<ThemeVariable, string> = {
   canvas: 'Background',
@@ -25,7 +19,7 @@ const themeVariableLabels: Record<ThemeVariable, string> = {
 // ── Tab registry ───────────────────────────────────────────────────
 
 /** Identifies a settings tab. Extend this union when adding a new tab. */
-export type SettingsTabId = 'themes' | 'terminal' | 'shortcuts'
+export type SettingsTabId = 'themes' | 'terminal' | 'shortcuts' | 'backend'
 
 /** Describes one tab in the settings modal. */
 export interface SettingsTabDefinition {
@@ -36,6 +30,7 @@ export interface SettingsTabDefinition {
 /** Ordered list of tabs rendered in the settings modal. */
 export const settingsTabs: SettingsTabDefinition[] = [
   { id: 'themes', label: 'Color themes' },
+  { id: 'backend', label: 'Backend connection' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'shortcuts', label: 'Shortcuts' },
 ]
@@ -43,11 +38,15 @@ export const settingsTabs: SettingsTabDefinition[] = [
 // ── Shared props ───────────────────────────────────────────────────
 
 interface SettingsPanelProps {
+  backendBaseUrl: string
   definitions: CommandDefinition[]
   shortcuts: Partial<Record<CommandId, string>>
   terminalCommand: string
   themes: Theme[]
   activeThemeId: string
+  onBackendBaseUrlChange: (value: string) => void
+  onBackendBaseUrlReset: () => void
+  onPreviewTheme: (theme: Theme | undefined) => void
   onChange: (id: CommandId, shortcut: string) => void
   onTerminalCommandChange: (value: string) => void
   onSelectTheme: (id: string) => void
@@ -87,6 +86,7 @@ interface ThemeSettingsProps {
   onUpdateThemeColor: (id: string, variable: ThemeVariable, color: string) => void
   onDeleteTheme: (id: string) => void
   onResetTheme: (id: string) => void
+  onPreviewTheme: (theme: Theme | undefined) => void
   onThemeNameChange: (name: string) => void
   onCommitThemeName: () => void
 }
@@ -104,21 +104,15 @@ function ThemeSettings(
     onResetTheme,
     onThemeNameChange,
     onCommitThemeName,
+    onPreviewTheme,
   }: ThemeSettingsProps,
 ) {
   // Theme hovered in the dropdown, applied live to the app until the pointer leaves.
   const [previewTheme, setPreviewTheme] = useState<Theme | undefined>(undefined)
 
   useEffect(() => {
-    const theme = previewTheme ?? activeTheme
-    if (!theme) return
-    const root = document.documentElement
-    root.dataset.theme = theme.mode
-    applyThemePalette(root, theme.palette)
-    const shadows = shadowForMode(theme.mode)
-    root.style.setProperty('--shadow', shadows.shadow)
-    root.style.setProperty('--shadow-soft', shadows['shadow-soft'])
-  }, [activeTheme, previewTheme])
+    onPreviewTheme(previewTheme)
+  }, [onPreviewTheme, previewTheme])
 
   return (
     <section className='theme-settings'>
@@ -228,6 +222,65 @@ function ThemeSettings(
   )
 }
 
+interface BackendSettingsProps {
+  backendBaseUrl: string
+  onChange: (value: string) => void
+  onReset: () => void
+}
+
+function BackendSettings({ backendBaseUrl, onChange, onReset }: BackendSettingsProps) {
+  const [draft, setDraft] = useState(backendBaseUrl)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setDraft(backendBaseUrl)
+    setError('')
+  }, [backendBaseUrl])
+
+  return (
+    <section>
+      <p>
+        Pi Livecraft runs inside the Hermes dashboard and talks to the separate local Node backend
+        that owns Pi sessions. Start it with <code>npm run dev</code> or{' '}
+        <code>npm start</code>, then point this tab at that service.
+      </p>
+      <label className='terminal-command-row'>
+        <span>Backend base URL</span>
+        <input
+          aria-label='Backend base URL'
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={DEFAULT_BACKEND_BASE_URL}
+          spellCheck={false}
+          value={draft}
+        />
+        {error && <small className='terminal-command-error'>{error}</small>}
+        <small>
+          Use the origin only, such as {DEFAULT_BACKEND_BASE_URL}. The default matches
+          <code>PI_LIVECRAFT_BACKEND_PORT</code>.
+        </small>
+      </label>
+      <div className='theme-toolbar'>
+        <button
+          onClick={() => {
+            try {
+              onChange(draft)
+              setError('')
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : String(cause))
+            }
+          }}
+          type='button'
+        >
+          Save backend URL
+        </button>
+        <button onClick={onReset} type='button'>
+          Use default
+        </button>
+      </div>
+    </section>
+  )
+}
+
 interface TerminalSettingsProps {
   terminalCommand: string
   onTerminalCommandChange: (value: string) => void
@@ -321,11 +374,15 @@ function ShortcutsSettings(
 
 /** Configures local shortcuts, terminal behavior, and editable color themes. */
 export function SettingsPanel({
+  backendBaseUrl,
   definitions,
   shortcuts,
   terminalCommand,
   themes,
   activeThemeId,
+  onBackendBaseUrlChange,
+  onBackendBaseUrlReset,
+  onPreviewTheme,
   onChange,
   onTerminalCommandChange,
   onSelectTheme,
@@ -392,12 +449,22 @@ export function SettingsPanel({
                 onCommitThemeName={commitThemeName}
                 onDeleteTheme={onDeleteTheme}
                 onDuplicateTheme={onDuplicateTheme}
+                onPreviewTheme={onPreviewTheme}
                 onSelectTheme={onSelectTheme}
                 onThemeNameChange={setThemeName}
                 onResetTheme={onResetTheme}
                 onUpdateThemeColor={onUpdateThemeColor}
                 themeName={themeName}
                 themes={themes}
+              />
+            </TabPanel>
+          )}
+          {activeTab === 'backend' && (
+            <TabPanel key='backend' id='settings-tab-backend' labelledBy='settings-tab-btn-backend'>
+              <BackendSettings
+                backendBaseUrl={backendBaseUrl}
+                onChange={onBackendBaseUrlChange}
+                onReset={onBackendBaseUrlReset}
               />
             </TabPanel>
           )}

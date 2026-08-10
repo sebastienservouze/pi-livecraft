@@ -58,7 +58,7 @@ jobs:
 
           ready=false
           for _ in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:5173/api/health > /dev/null 2>&1; then
+            if curl --fail --silent http://127.0.0.1:43121/api/health > /dev/null 2>&1; then
               ready=true
               break
             fi
@@ -73,7 +73,7 @@ jobs:
             exit 1
           fi
 
-          if ! curl --fail --silent --show-error http://127.0.0.1:5173/ > /dev/null; then
+          if [[ ! -f dashboard/dist/index.js || ! -f dashboard/dist/style.css ]]; then
             cat "$log_file"
             exit 1
           fi

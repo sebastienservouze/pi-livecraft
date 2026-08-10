@@ -1,11 +1,10 @@
-import { createPortal } from 'react-dom'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import './tooltip.css'
 
 const SHOW_DELAY_MS = 600
 const HIDE_TRANSITION_MS = 150
 
-/** Renders a tooltip in the document layer so parent containers cannot clip it. Delays appearance to avoid flicker during quick pointer movement and fades in/out with a CSS transition. */
+/** Renders a fixed-position tooltip so parent containers cannot clip it. Delays appearance to avoid flicker during quick pointer movement and fades in/out with a CSS transition. */
 export function Tooltip({
   children,
   label,
@@ -136,24 +135,22 @@ export function Tooltip({
       >
         {children}
       </span>
-      {mounted
-        && createPortal(
-          <div
-            className='tooltip-content'
-            data-entered={entered || undefined}
-            ref={tooltipRef}
-            role='tooltip'
-            style={{
-              left: position?.left ?? 0,
-              top: position?.top ?? 0,
-              visibility: position ? 'visible' : 'hidden',
-            }}
-          >
-            <span className='tooltip-label'>{label}</span>
-            {hint && <span className='tooltip-hint'>{hint}</span>}
-          </div>,
-          document.body,
-        )}
+      {mounted && (
+        <div
+          className='tooltip-content'
+          data-entered={entered || undefined}
+          ref={tooltipRef}
+          role='tooltip'
+          style={{
+            left: position?.left ?? 0,
+            top: position?.top ?? 0,
+            visibility: position ? 'visible' : 'hidden',
+          }}
+        >
+          <span className='tooltip-label'>{label}</span>
+          {hint && <span className='tooltip-hint'>{hint}</span>}
+        </div>
+      )}
     </>
   )
 }

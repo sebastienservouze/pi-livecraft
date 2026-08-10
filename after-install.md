@@ -14,7 +14,7 @@ On Windows, Pi needs Bash (Git for Windows or `shellPath` in `~/.pi/agent/settin
 hermes pi-coding-ui start
 ```
 
-This installs Node dependencies on first run, then starts the manager and backend on `127.0.0.1`.
+This installs Node dependencies on first run, then starts the manager and backend on `127.0.0.1`. CORS is automatic for both local and reverse-proxied Hermes dashboards (the backend mirrors the browser origin while listening on loopback only).
 
 **Windows:** background start is not supported — run in the foreground or use `npm start` in the plugin directory instead:
 

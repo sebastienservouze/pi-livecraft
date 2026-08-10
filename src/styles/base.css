@@ -40,8 +40,7 @@
 
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   min-width: 320px;
-  min-height: 0;
-  height: 100%;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--workspace-sidebar-width, 272px) minmax(0, 1fr);
   overflow: hidden;

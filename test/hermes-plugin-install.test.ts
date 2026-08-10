@@ -22,6 +22,7 @@ test('plugin.yaml matches dashboard manifest name and version', () => {
   assert.match(pluginYaml, /^version: 1\.2\.0/m)
   assert.equal(manifest.name, 'hermes-pi-coding-ui-plugin')
   assert.equal(manifest.version, '1.2.0')
+  assert.equal(manifest.entry, 'dist/index.js')
 })
 
 test('after-install.md documents install flow commands', () => {

@@ -1,17 +1,20 @@
 /** Re-exports the Hermes dashboard host React instance for aliased `react` imports. */
-import * as DevReact from 'react'
+type ReactNamespace = typeof import('react')
 
 declare global {
   interface Window {
-    __HERMES_PLUGIN_SDK__?: { React: typeof DevReact }
+    __HERMES_PLUGIN_SDK__?: { React: ReactNamespace }
   }
 }
 
-function resolveReact(): typeof DevReact {
-  if (typeof window !== 'undefined' && window.__HERMES_PLUGIN_SDK__?.React) {
-    return window.__HERMES_PLUGIN_SDK__.React
+function resolveReact(): ReactNamespace {
+  const hostReact = typeof window !== 'undefined'
+    ? window.__HERMES_PLUGIN_SDK__?.React
+    : undefined
+  if (!hostReact) {
+    throw new Error('Hermes plugin SDK React is unavailable')
   }
-  return DevReact
+  return hostReact
 }
 
 const React = resolveReact()

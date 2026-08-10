@@ -82,7 +82,7 @@ npm run verify:dist
 | --- | --- | --- |
 | `PI_LIVECRAFT_BACKEND_PORT` | `43121` | Backend HTTP + SSE port |
 | `PI_LIVECRAFT_MANAGER_PORT` | `43120` | Manager JSON Lines port |
-| `PI_LIVECRAFT_CORS_ORIGIN` | `http://127.0.0.1:9119` | Allowed Hermes dashboard origin |
+| `PI_LIVECRAFT_CORS_ORIGIN` | _(unset)_ | Optional CORS allowlist (comma-separated). When unset, the loopback-bound backend mirrors the browser `Origin` so reverse-proxied Hermes dashboards work with no extra setup. |
 
 Backend URL can also be changed in Settings → Backend connection (stored in browser `localStorage`).
 
@@ -130,7 +130,7 @@ Pi RPC integration tests require a configured `pi` installation.
 - **`pi: command not found`** — install Pi globally; on Windows, `where.exe pi.cmd` must succeed.
 - **Backend unavailable** — confirm ports `43120`/`43121` or env overrides; after a manager crash, restart with `hermes pi-coding-ui start` or `npm run dev`.
 - **Plugin tab missing** — run `hermes plugins list`, confirm the plugin is enabled, then rescan: `curl http://127.0.0.1:9119/api/dashboard/plugins/rescan`.
-- **CORS errors** — backend must allow the Hermes dashboard origin; set `PI_LIVECRAFT_CORS_ORIGIN` if the dashboard port differs.
+- **CORS errors** — the backend listens on `127.0.0.1` and mirrors the browser `Origin` by default. If you set `PI_LIVECRAFT_CORS_ORIGIN`, it becomes a strict allowlist (plus loopback); include your Hermes dashboard origin there.
 
 ## License
 

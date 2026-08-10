@@ -1,6 +1,6 @@
 # Terminal action
 
-Terminal is a direct workspace action rather than a panel widget. Selecting it opens an external terminal in the current workspace and leaves the Livecraft conversation where it is.
+Terminal is a direct workspace action rather than a panel widget. Selecting it opens an external terminal in the current workspace and leaves the conversation where it is.
 
 ## Where it is available
 
@@ -8,7 +8,7 @@ Terminal is a direct workspace action rather than a panel widget. Selecting it o
 - from the command palette;
 - from the editable `Open terminal` shortcut, which defaults to `Alt+T`.
 
-Launch errors appear as regular Livecraft notifications.
+Launch errors appear as regular notifications.
 
 ## Launcher selection
 

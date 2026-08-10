@@ -28,7 +28,7 @@ export default defineConfig({
     lib: {
       entry: resolve(projectRoot, 'src/plugin-entry.tsx'),
       formats: ['iife'],
-      name: 'PiLivecraftPlugin',
+      name: 'HermesPiCodingUiPlugin',
       fileName: () => 'index.js',
     },
     outDir: 'dashboard/dist',

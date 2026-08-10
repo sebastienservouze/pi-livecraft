@@ -1,10 +1,10 @@
-export const PLUGIN_NAME = 'pi-livecraft'
+export const PLUGIN_NAME = 'hermes-pi-coding-ui-plugin'
 
 export interface HermesPluginRegistry {
   register: (name: string, component: unknown) => void
 }
 
-/** Registers the Pi Livecraft page with the Hermes dashboard plugin host. */
+/** Registers the plugin page with the Hermes dashboard host. */
 export function registerPiLivecraftPlugin(
   Component: unknown,
   registry: HermesPluginRegistry | undefined,

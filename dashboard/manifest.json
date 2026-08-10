@@ -1,11 +1,11 @@
 {
-  "name": "pi-livecraft",
-  "label": "Pi Livecraft",
-  "description": "Visual Pi coding agent workbench with sessions, composer, Git, and workspace widgets.",
+  "name": "hermes-pi-coding-ui-plugin",
+  "label": "Pi Coding UI",
+  "description": "Hermes dashboard UI for Pi coding agent sessions, composer, Git, and workspace widgets.",
   "icon": "Terminal",
   "version": "1.2.0",
   "tab": {
-    "path": "/pi-livecraft",
+    "path": "/hermes-pi-coding-ui-plugin",
     "position": "after:skills"
   },
   "entry": "dist/index.js",

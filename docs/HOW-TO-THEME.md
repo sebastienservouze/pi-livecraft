@@ -1,6 +1,6 @@
-# How to theme Pi Livecraft
+# How to theme the plugin UI
 
-Pi Livecraft uses 8 **source colours** editable in the Settings panel. All visual roles — surface variants, text shades, borders, hover states, and contrast colours — are generated automatically via CSS `color-mix()`.
+The UI uses 8 **source colours** editable in the Settings panel. Surface variants, text shades, borders, hover states, and contrast colours are generated via CSS `color-mix()`.
 
 ## Source colours
 

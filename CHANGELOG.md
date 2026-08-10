@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Repackage Pi Livecraft as a Hermes web dashboard plugin instead of a standalone Vite SPA served by the backend.
+- Repackage the UI as a Hermes web dashboard plugin (`hermes-pi-coding-ui-plugin`) instead of a standalone Vite SPA served by the backend.
 - Scope plugin CSS under `.app-shell` and talk to the Node backend over a configurable cross-origin base URL with CORS.
 
 ### Removed
@@ -35,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Run Pi Livecraft natively on Windows, including process launching, home-path resolution, terminal and directory completion.
+- Run the plugin services natively on Windows, including process launching, home-path resolution, terminal and directory completion.
 - Manage sessions directly from the sidebar: rename them or close running Pi sessions without losing persisted history; the next nearby active session is selected automatically.
 - Reclaim sidebar space by collapsing the sessions panel.
 - Keep changes safer with CI checks (typecheck, lint, tests) against the latest Pi version.

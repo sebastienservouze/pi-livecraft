@@ -19,7 +19,7 @@ Completing a task removes it from the visible open list and updates the rail cou
 
 Starting work from a task stores a link between that task and the new Pi session. The row then shows the session name and its current activity state instead of the two launch actions. Selecting the row navigates back to that session.
 
-If the session is renamed elsewhere in Livecraft, the linked task follows the new name. The task itself remains under the user's control and is not completed automatically when Pi stops.
+If the session is renamed elsewhere in the UI, the linked task follows the new name. The task itself remains under the user's control and is not completed automatically when Pi stops.
 
 ## Persistence and ownership
 

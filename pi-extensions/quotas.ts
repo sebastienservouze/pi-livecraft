@@ -12,7 +12,7 @@ import type {
 const statusKey = 'pi-livecraft.quotas'
 const timeoutMs = 15_000
 
-/** Registers a silent RPC command that publishes only normalized quotas to Pi Livecraft. */
+/** Registers a silent RPC command that publishes only normalized quotas to the plugin UI. */
 export default function registerQuotas(pi: ExtensionAPI): void {
   let lastRefreshAt = 0
   let lastReport: QuotaReport | undefined
@@ -40,7 +40,7 @@ export default function registerQuotas(pi: ExtensionAPI): void {
     void refresh(ctx, true)
   })
   pi.registerCommand('livecraft-quotas', {
-    description: 'Refresh Pi Livecraft quotas',
+    description: 'Refresh Pi Coding UI quotas',
     handler: async (args, ctx) => refresh(ctx, args.trim() === 'auto'),
   })
 }

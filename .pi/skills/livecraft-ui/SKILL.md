@@ -1,9 +1,9 @@
 ---
 name: livecraft-ui
-description: Use for any visual creation, redesign, layout, styling, theming, or visual fix in Pi Livecraft. Covers components, panels, modals, toolbars, forms, settings, widgets, status displays, and conversation surfaces. Not for frontend changes without visual impact (API calls, state wiring, data plumbing, event handlers).
+description: Use for any visual creation, redesign, layout, styling, theming, or visual fix in hermes-pi-coding-ui-plugin. Covers components, panels, modals, toolbars, forms, settings, widgets, status displays, and conversation surfaces. Not for frontend changes without visual impact (API calls, state wiring, data plumbing, event handlers).
 ---
 
-Designs and refines Pi Livecraft's interface. Production code that respects the visual contract; no speculative decoration.
+Designs and refines the Pi Coding UI plugin interface. Production code that respects the visual contract; no speculative decoration.
 
 ## Required workflow
 
@@ -21,7 +21,7 @@ Before changing or creating any visual element, you MUST follow these steps in o
 
 ## Visual character
 
-Pi Livecraft is a dense, calm, precise work tool. Hierarchy comes from contrast, surface layering, alignment, and density — not decoration. Interfaces stay compact without feeling cramped. Colour serves actions and states, not ornament.
+The Pi Coding UI is a dense, calm, precise work tool. Hierarchy comes from contrast, surface layering, alignment, and density — not decoration. Interfaces stay compact without feeling cramped. Colour serves actions and states, not ornament.
 
 ## Defaults for new code
 

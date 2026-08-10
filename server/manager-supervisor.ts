@@ -37,7 +37,7 @@ async function launch(): Promise<void> {
         console.error(
           `Pi manager stopped unexpectedly (${
             signal ?? code ?? 'unknown'
-          }); restart Pi Livecraft to recover.`,
+          }); restart npm run dev to recover.`,
         )
         failureHold = setInterval(() => undefined, 60_000)
       }

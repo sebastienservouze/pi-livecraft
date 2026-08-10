@@ -12,7 +12,7 @@ import {
   parseAskUserQuestionRequest,
   parseAskUserQuestionResponse,
 } from '../shared/ask-user-question.ts'
-const rpcTitle = 'Pi Livecraft questionnaire'
+const rpcTitle = 'Pi Coding UI questionnaire'
 export default function registerAskUserQuestion(pi: ExtensionAPI): void {
   // Register after extension loading so a same-named auto-discovered tool does not trigger Pi's fatal load diagnostic.
   pi.on('session_start', () => registerAskUserQuestionTool(pi))
@@ -57,7 +57,7 @@ function registerAskUserQuestionTool(pi: ExtensionAPI): void {
 
       const response = ctx.mode === 'tui'
         ? await askInTui(request, ctx)
-        : await askInLivecraft(request, ctx)
+        : await askInPluginUi(request, ctx)
       return result(
         response,
         response.cancelled
@@ -68,7 +68,7 @@ function registerAskUserQuestionTool(pi: ExtensionAPI): void {
   })
 }
 
-async function askInLivecraft(request: AskUserQuestionRequest, ctx: ExtensionContext) {
+async function askInPluginUi(request: AskUserQuestionRequest, ctx: ExtensionContext) {
   const value = await ctx.ui.editor(rpcTitle, JSON.stringify(request))
   if (!value) return { answers: [], cancelled: true }
   try {

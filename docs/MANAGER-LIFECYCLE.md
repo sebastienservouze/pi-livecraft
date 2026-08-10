@@ -46,7 +46,7 @@ The backend emits these states through the `manager_status` SSE event. `canResta
 5. Only that exit code lets the supervisor calculate a fresh revision and start the replacement.
 6. The monitor returns to `current` only after a different manager instance reconnects with the expected revision.
 
-Idle Pi processes are closed by this restart. Their persisted sessions remain in history and can be reopened. Pi is launched directly rather than through an npm command shell, so the manager owns the actual RPC process on every supported platform. If the manager crashes or exits with another code, the supervisor stays alive without relaunching it; restart Pi Livecraft to recover.
+Idle Pi processes are closed by this restart. Their persisted sessions remain in history and can be reopened. Pi is launched directly rather than through an npm command shell, so the manager owns the actual RPC process on every supported platform. If the manager crashes or exits with another code, the supervisor stays alive without relaunching it; restart `npm run dev` to recover.
 
 ## Changing this lifecycle
 

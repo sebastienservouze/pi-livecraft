@@ -637,7 +637,7 @@ function App() {
         ) selectCreatedSession(sessionId)
         if (event.method === 'notify' && typeof event.message === 'string')
           showToast('notice', event.message, sessionId)
-        // Intercept agent selector silently when Livecraft requested the options list.
+        // Intercept agent selector silently when the plugin requested the options list.
         if (isAgentSelector(event) && agentOptionsLoadingRef.current[sessionId]) {
           const options = event.options.filter((o): o is string => typeof o === 'string')
           setAgentOptions((current) => ({ ...current, [sessionId]: options }))

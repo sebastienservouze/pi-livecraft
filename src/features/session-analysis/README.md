@@ -26,7 +26,7 @@ Turn charts, ranked tool calls, and costly request rows link back to the corresp
 
 Pi's session totals remain authoritative. When a total cost cannot be matched to visible model requests, the widget reports the difference as unattributed rather than guessing where it belongs.
 
-Historical messages provide token and cost data. Request and tool durations are only available when they were observed during the current Pi Livecraft run, so reopened sessions can have complete costs but partial timing information.
+Historical messages provide token and cost data. Request and tool durations are only available when they were observed during the current plugin run, so reopened sessions can have complete costs but partial timing information.
 
 Tool input and output rankings measure serialized input and raw output size, not provider tokens. Individual tool calls have no monetary cost attribution; monetary costs belong to requests. A tool failure is counted only when Pi reports `isError === true`. The interpretation reports duration signals only with their measurement coverage and treats partial data as such.
 

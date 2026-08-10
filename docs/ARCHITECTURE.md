@@ -1,6 +1,6 @@
 # Project architecture
 
-Pi Livecraft separates the Hermes dashboard plugin UI, local HTTP API, and Pi processes so that rebuilding the plugin or restarting the backend does not close active sessions.
+`hermes-pi-coding-ui-plugin` separates the Hermes dashboard plugin UI, local HTTP API, and Pi processes so rebuilding the plugin or restarting the backend does not close active sessions.
 
 ```text
 Hermes dashboard (host page)
@@ -17,7 +17,7 @@ server/backend.ts ─── JSON Lines over local TCP ──▶ server/manager.t
 
 ## Frontend
 
-The UI ships as a **Hermes web dashboard plugin** (`dashboard/manifest.json`, `src/plugin-entry.tsx`, built bundle in `dashboard/dist/`). Hermes injects the bundle and mounts the registered component as the `/pi-livecraft` tab. React comes from `window.__HERMES_PLUGIN_SDK__.React` through the aliased shims in `src/plugin/`; do not import the npm `react` package from feature code.
+The UI ships as a **Hermes web dashboard plugin** (`dashboard/manifest.json`, `src/plugin-entry.tsx`, built bundle in `dashboard/dist/`). Hermes injects the bundle and mounts the registered component as the `/hermes-pi-coding-ui-plugin` tab. React comes from `window.__HERMES_PLUGIN_SDK__.React` through the aliased shims in `src/plugin/`; do not import the npm `react` package from feature code.
 
 `src/App.tsx` remains the cross-cutting orchestrator: it receives the SSE stream, applies effects that span features (dialogs, Git, quotas, notifications, and manager state), and connects the panels. Workspace/session lifecycle belongs to `useWorkspaceSessions`; selected-conversation snapshots, replay, streaming, and tool execution state belong to `useConversationRuntime`. Area-specific logic and rendering live in `src/features/`:
 

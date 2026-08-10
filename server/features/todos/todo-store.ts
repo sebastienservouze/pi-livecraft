@@ -66,7 +66,7 @@ export function parseTodoItems(value: unknown): TodoItem[] {
 export function parseTodoStore(content: string): TodoStore {
   const value: unknown = JSON.parse(content)
   if (!isObject(value) || !isObject(value.workspaces))
-    throw new Error('Invalid Pi Livecraft todo store')
+    throw new Error('Invalid plugin todo store')
   return {
     workspaces: Object.fromEntries(
       Object.entries(value.workspaces).map((

@@ -248,7 +248,7 @@ export function WorkspaceSidebar({
       <div className='brand'>
         <span className='brand-mark'>π</span>
         <div>
-          <strong>Pi Livecraft</strong>
+          <strong>Pi Coding UI</strong>
           <small>Local workspace</small>
         </div>
         <Tooltip label='Settings'>

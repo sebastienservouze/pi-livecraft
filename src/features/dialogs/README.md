@@ -9,7 +9,7 @@ owning session. `App.tsx` owns the cross-session queue and decides which request
 - `App.tsx` receives `extension_ui_request` events and retains pending requests by session.
 - `dialog-protocol.ts` recognizes supported request shapes and identifies blocking dialogs.
 - `Dialogs.tsx` responds through `sendPiCommand(..., { type: 'extension_ui_response', ... })`.
-- Generic Pi extension requests keep their public RPC fields. The Livecraft questionnaire uses the
+- Generic Pi extension requests keep their public RPC fields. The plugin questionnaire uses the
   versioned parser in `shared/ask-user-question.ts`.
 - `pi-extensions/ask-user-question.ts` creates that questionnaire payload; browser-specific logic
   must not move into the extension.

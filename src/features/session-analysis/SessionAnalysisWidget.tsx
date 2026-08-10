@@ -262,7 +262,7 @@ export function SessionAnalysisWidget(
           : (
             <EmptyState>
               {toolUsageRanking === 'duration'
-                ? 'Durations are measured during this Pi Livecraft session.'
+                ? 'Durations are measured during this plugin session.'
                 : 'No tool calls in this session.'}
             </EmptyState>
           )}
@@ -298,7 +298,7 @@ export function SessionAnalysisWidget(
           : (
             <EmptyState>
               {toolRanking === 'duration'
-                ? 'Durations are measured during this Pi Livecraft session.'
+                ? 'Durations are measured during this plugin session.'
                 : toolRanking === 'failure'
                 ? 'No explicit failures in this session.'
                 : 'No tool calls in this session.'}

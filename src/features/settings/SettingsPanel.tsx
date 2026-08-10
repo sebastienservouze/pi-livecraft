@@ -240,7 +240,7 @@ function BackendSettings({ backendBaseUrl, onChange, onReset }: BackendSettingsP
   return (
     <section>
       <p>
-        Pi Livecraft runs inside the Hermes dashboard and talks to the separate local Node backend
+        Pi Coding UI runs inside the Hermes dashboard and talks to the separate local Node backend
         that owns Pi sessions. Start it with <code>npm run dev</code> or{' '}
         <code>npm start</code>, then point this tab at that service.
       </p>

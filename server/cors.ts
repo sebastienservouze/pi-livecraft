@@ -1,4 +1,4 @@
-/** CORS helpers for the Pi Livecraft backend when called from the Hermes dashboard. */
+/** CORS helpers for the plugin backend when called from the Hermes dashboard. */
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 export const DEFAULT_CORS_ORIGIN = 'http://127.0.0.1:9119'

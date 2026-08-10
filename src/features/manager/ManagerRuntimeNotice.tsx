@@ -54,7 +54,7 @@ export function ManagerRuntimeNotice(
     ? 'Wait for active Pi sessions to finish before restarting.'
     : status.canRestart
     ? 'The running code no longer matches its runtime files. Idle sessions will close and can be reopened from history.'
-    : 'Restart Pi Livecraft to load the updated manager code.'
+    : 'Restart the plugin services to load the updated manager code.'
 
   const label = `${title}. ${description}`
 

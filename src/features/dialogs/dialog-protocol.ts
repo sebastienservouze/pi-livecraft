@@ -13,7 +13,7 @@ export interface UiDialog {
 export function isAskUserQuestionDialog(value: JsonObject): boolean {
   const payload = typeof value.prefill === 'string' ? safeJsonParse(value.prefill) : null
   return value.method === 'editor'
-    && value.title === 'Pi Livecraft questionnaire'
+    && value.title === 'Pi Coding UI questionnaire'
     && isObject(payload)
     && payload.protocol === askUserQuestionProtocol
     && parseAskUserQuestionRequest(payload) !== null

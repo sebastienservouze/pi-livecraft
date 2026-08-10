@@ -22,6 +22,6 @@ For the rail summary, Codex prefers its five-hour window. Copilot uses the first
 
 `App.tsx` owns the shared quota snapshot. `QuotaWidget` renders it, and `quota-display.ts` derives the compact rail value for the active provider.
 
-Requests travel through `src/api.ts` and the [quotas backend capability](/server/features/quotas/README.md). Pi Livecraft's quota extension publishes a validated, versioned status payload through Pi rather than reading provider state directly from the browser.
+Requests travel through `src/api.ts` and the [quotas backend capability](/server/features/quotas/README.md). The quota extension publishes a validated, versioned status payload through Pi rather than reading provider state directly from the browser.
 
 Focused coverage: `test/quotas.test.ts`.

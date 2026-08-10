@@ -32,11 +32,12 @@
     "start:backend": "node server/backend.ts",
     "start:manager": "node server/manager-supervisor.ts",
     "build": "npm run typecheck && vite build",
+    "verify:dist": "git diff --exit-code dashboard/dist/",
     "typecheck": "tsc -b",
     "format": "dprint fmt",
     "format:check": "dprint check",
     "lint": "oxlint .",
-    "test": "node --test",
+    "test": "node --test && PYTHONPATH=. python3 test/hermes_plugin_runtime.test.py",
     "eval:documentation-routing": "node --test evals/documentation-routing.ts",
     "prepare": "husky"
   },

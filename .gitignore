@@ -1,5 +1,9 @@
 node_modules/
-dist/
+__pycache__/
+*.py[cod]
+# Root Vite/build output only; dashboard/dist/ is committed for Hermes install.
+/dist/
+dashboard/dist/.vite/
 *.log
 *.local
 .env

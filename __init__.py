@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from hermes_plugin import runtime
+from .hermes_plugin import runtime
 
 
 def _handle_command(args) -> None:

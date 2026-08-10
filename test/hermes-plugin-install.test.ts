@@ -30,3 +30,9 @@ test('after-install.md documents install flow commands', () => {
   assert.match(content, /hermes dashboard/)
   assert.match(content, /plugins\/rescan/)
 })
+
+test('plugin entrypoint uses a relative hermes_plugin import for Hermes loading', () => {
+  const content = readFileSync(join(repoRoot, '__init__.py'), 'utf8')
+  assert.match(content, /from \.hermes_plugin import runtime/)
+  assert.doesNotMatch(content, /^from hermes_plugin import runtime/m)
+})

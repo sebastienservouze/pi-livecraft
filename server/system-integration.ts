@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { stat } from 'node:fs/promises'
 
-export type DesktopPlatform = 'linux' | 'wsl' | 'windows'
+export type DesktopPlatform = 'linux' | 'macos' | 'wsl' | 'windows'
 type SpawnProcess = (
   command: string,
   args: string[],
@@ -14,6 +14,7 @@ export function getDesktopPlatform(
   platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): DesktopPlatform {
+  if (platform === 'darwin') return 'macos'
   if (platform === 'win32') return 'windows'
   if (platform !== 'linux') throw new Error(`Unsupported platform: ${platform}`)
   return env.WSL_DISTRO_NAME || env.WSL_INTEROP ? 'wsl' : 'linux'
@@ -37,7 +38,7 @@ export async function openPath(
     else await invokeWindowsPath(path, spawnProcess)
     return
   }
-  const command = platform === 'wsl' ? 'explorer.exe' : 'xdg-open'
+  const command = platform === 'wsl' ? 'explorer.exe' : platform === 'macos' ? 'open' : 'xdg-open'
   await openApplication(command, await externalWorkspacePath(path, platform), spawnProcess)
 }
 

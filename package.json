@@ -37,7 +37,7 @@
     "format": "dprint fmt",
     "format:check": "dprint check",
     "lint": "oxlint .",
-    "test": "node --test && PYTHONPATH=. python3 test/hermes_plugin_runtime.test.py",
+    "test": "node --test && PYTHONPATH=. python3 test/hermes_plugin_runtime.test.py && PYTHONPATH=. python3 test/hermes_plugin_api.test.py",
     "eval:documentation-routing": "node --test evals/documentation-routing.ts",
     "prepare": "husky"
   },

@@ -9,8 +9,9 @@ import {
   openPath,
 } from '../server/system-integration.ts'
 
-test('detects Linux and WSL from the runtime environment', () => {
+test('detects Linux, macOS, and WSL from the runtime environment', () => {
   assert.equal(getDesktopPlatform('linux', {}), 'linux')
+  assert.equal(getDesktopPlatform('darwin', {}), 'macos')
   assert.equal(getDesktopPlatform('linux', { WSL_DISTRO_NAME: 'Ubuntu' }), 'wsl')
   assert.equal(getDesktopPlatform('win32', {}), 'windows')
 })
@@ -20,9 +21,37 @@ test('reads the current WSL distribution name when available', () => {
   assert.equal(getWslDistributionName({ WSL_INTEROP: '/run/WSL/1_interop' }), undefined)
 })
 
-test('keeps Linux and native Windows workspace paths unchanged', async () => {
+test('keeps Linux, macOS, and native Windows workspace paths unchanged', async () => {
   assert.equal(await externalWorkspacePath('/home/user/project', 'linux'), '/home/user/project')
+  assert.equal(await externalWorkspacePath('/Users/ada/project', 'macos'), '/Users/ada/project')
   assert.equal(await externalWorkspacePath('C:\\Users\\Ada', 'windows'), 'C:\\Users\\Ada')
+})
+
+test('opens macOS paths through the open command', async () => {
+  let call:
+    | { command: string; args: string[]; options: Parameters<typeof spawn>[2] }
+    | undefined
+  let unrefCalled = false
+  await openPath(
+    '/Users/ada/hostile & ü/workspace',
+    'macos',
+    ((command: string, args: string[], options: Parameters<typeof spawn>[2]) => {
+      call = { command, args, options }
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => {
+        unrefCalled = true
+      }
+      queueMicrotask(() => child.emit('spawn'))
+      return child as never
+    }) as never,
+  )
+
+  assert.equal(call?.command, 'open')
+  assert.deepEqual(call?.args, ['/Users/ada/hostile & ü/workspace'])
+  assert.equal(call?.options?.detached, true)
+  assert.equal(call?.options?.shell, false)
+  assert.equal(call?.options?.stdio, 'ignore')
+  assert.equal(unrefCalled, true)
 })
 
 test('opens Windows paths through a hidden PowerShell broker with a visible shell-associated process', async () => {

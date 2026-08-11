@@ -3,7 +3,7 @@ import * as Select from '@radix-ui/react-select'
 import type { CommandDefinition, CommandId } from '../commands/command-registry.ts'
 import { shortcutFromEvent, shortcutConflicts } from '../commands/command-registry.ts'
 import { contrastColor, THEME_VARIABLES, type Theme, type ThemeVariable } from './themes.ts'
-import { DEFAULT_BACKEND_BASE_URL } from './backend-connection.ts'
+import { defaultBackendBaseUrl, HERMES_PLUGIN_BACKEND_PATH } from './backend-connection.ts'
 
 const themeVariableLabels: Record<ThemeVariable, string> = {
   canvas: 'Background',
@@ -240,23 +240,26 @@ function BackendSettings({ backendBaseUrl, onChange, onReset }: BackendSettingsP
   return (
     <section>
       <p>
-        Pi Coding UI runs inside the Hermes dashboard and talks to the separate local Node backend
-        that owns Pi sessions. Start it with <code>npm run dev</code> or{' '}
-        <code>npm start</code>, then point this tab at that service.
+        Pi Coding UI runs inside the Hermes dashboard. By default this tab talks to the Pi backend
+        on the same server through the Hermes plugin proxy at{' '}
+        <code>{HERMES_PLUGIN_BACKEND_PATH}</code>. Start that backend on the server with{' '}
+        <code>hermes pi-coding-ui start</code>.
       </p>
       <label className='terminal-command-row'>
         <span>Backend base URL</span>
         <input
           aria-label='Backend base URL'
           onChange={(event) => setDraft(event.target.value)}
-          placeholder={DEFAULT_BACKEND_BASE_URL}
+          placeholder={defaultBackendBaseUrl()}
           spellCheck={false}
           value={draft}
         />
         {error && <small className='terminal-command-error'>{error}</small>}
         <small>
-          Use the origin only, such as {DEFAULT_BACKEND_BASE_URL}. The default matches
-          <code>PI_LIVECRAFT_BACKEND_PORT</code>.
+          Use the Hermes plugin mount or a direct loopback URL such as{' '}
+          <code>http://127.0.0.1:43121</code>{' '}
+          for local debugging. The default uses the dashboard origin plus{' '}
+          <code>{HERMES_PLUGIN_BACKEND_PATH}</code>.
         </small>
       </label>
       <div className='theme-toolbar'>

@@ -2,7 +2,7 @@
 
 Hermes dashboard plugin that provides a browser UI for [Pi](https://pi.dev) coding agent sessions: workspaces, composer, conversation, Git, quotas, todos, and sidebar widgets.
 
-The React UI loads inside `hermes dashboard`. A separate local Node backend and manager own Pi RPC processes on `127.0.0.1`.
+The React UI loads inside `hermes dashboard`. The Pi backend and manager run on the **same server** as Hermes (`127.0.0.1`), and the tab reaches them through the Hermes plugin proxy at `/api/plugins/hermes-pi-coding-ui-plugin`.
 
 ## Requirements
 
@@ -84,7 +84,7 @@ npm run verify:dist
 | `PI_LIVECRAFT_MANAGER_PORT` | `43120` | Manager JSON Lines port |
 | `PI_LIVECRAFT_CORS_ORIGIN` | _(unset)_ | Optional CORS allowlist (comma-separated). When unset, the loopback-bound backend mirrors the browser `Origin` so reverse-proxied Hermes dashboards work with no extra setup. |
 
-Backend URL can also be changed in Settings → Backend connection (stored in browser `localStorage`).
+Backend URL can also be changed in Settings → Backend connection (stored in browser `localStorage`). The default uses the Hermes plugin proxy on the dashboard origin; override with `http://127.0.0.1:43121` only for direct local debugging.
 
 Production backend only (no watch build):
 
@@ -95,9 +95,12 @@ npm start
 ## Architecture
 
 ```text
-Hermes dashboard
+Hermes dashboard (same server)
   └─ dashboard/dist/index.js  (plugin tab)
-        │ HTTP + SSE (CORS)
+        │ same-origin HTTP + SSE
+        ▼
+dashboard/plugin_api.py  (/api/plugins/hermes-pi-coding-ui-plugin)
+        │ loopback proxy
         ▼
 server/backend.ts
         │ JSON Lines
@@ -128,7 +131,8 @@ Pi RPC integration tests require a configured `pi` installation.
 ## Troubleshooting
 
 - **`pi: command not found`** — install Pi globally; on Windows, `where.exe pi.cmd` must succeed.
-- **Backend unavailable** — confirm ports `43120`/`43121` or env overrides; after a manager crash, restart with `hermes pi-coding-ui start` or `npm run dev`.
+- **Backend unavailable** — on the server running Hermes, confirm `hermes pi-coding-ui status` and ports `43120`/`43121`; after a manager crash, restart with `hermes pi-coding-ui start`.
+- **Open Folder / Open Terminal hit the wrong machine** — the Pi backend must run on the Hermes server, not your laptop. The tab defaults to the Hermes plugin proxy; remove any custom Backend URL pointing at local `127.0.0.1`.
 - **Plugin tab missing** — run `hermes plugins list`, confirm the plugin is enabled, then rescan: `curl http://127.0.0.1:9119/api/dashboard/plugins/rescan`.
 - **CORS errors** — the backend listens on `127.0.0.1` and mirrors the browser `Origin` by default. If you set `PI_LIVECRAFT_CORS_ORIGIN`, it becomes a strict allowlist (plus loopback); include your Hermes dashboard origin there.
 

@@ -71,12 +71,23 @@ test('uses the platform terminal defaults', () => {
     args: [],
     cwd: '/home/user',
   })
+  assert.deepEqual(defaultTerminalInvocation('/Users/ada/project', 'macos'), {
+    command: 'open',
+    args: ['-a', 'Terminal', '/Users/ada/project'],
+  })
   assert.deepEqual(
     defaultTerminalInvocation('/home/user', 'wsl', { WSL_DISTRO_NAME: 'Ubuntu-22.04' }),
     {
       command: 'wt.exe',
       args: ['nt', '--', 'wsl.exe', '-d', 'Ubuntu-22.04', '--cd', '/home/user'],
     },
+  )
+})
+
+test('uses the legacy tokenizer on macOS', () => {
+  assert.deepEqual(
+    tokenizeTemplate('open -a Terminal "{cwd}"', 'macos'),
+    ['open', '-a', 'Terminal', '{cwd}'],
   )
 })
 

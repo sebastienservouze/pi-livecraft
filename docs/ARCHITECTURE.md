@@ -3,11 +3,14 @@
 `hermes-pi-coding-ui-plugin` separates the Hermes dashboard plugin UI, local HTTP API, and Pi processes so rebuilding the plugin or restarting the backend does not close active sessions.
 
 ```text
-Hermes dashboard (host page)
+Hermes dashboard (host page, same server)
     │ loads dashboard/dist/index.js + style.css
     ▼
 React plugin tab (src/App.tsx …)
-    │ HTTP + SSE (absolute backend origin, CORS)
+    │ same-origin HTTP + SSE via /api/plugins/hermes-pi-coding-ui-plugin
+    ▼
+dashboard/plugin_api.py (Hermes FastAPI mount)
+    │ loopback proxy
     ▼
 server/backend.ts ─── JSON Lines over local TCP ──▶ server/manager.ts ─── Pi public RPC ──▶ pi --mode rpc
                                                         ▲
@@ -31,7 +34,9 @@ The UI ships as a **Hermes web dashboard plugin** (`dashboard/manifest.json`, `s
 
 Use the [`src/features/` map](/src/features/README.md) to locate frontend ownership. Features with non-obvious contracts add a short README beside their code rather than expanding this system overview.
 
-`src/api.ts` is the frontend's only HTTP and SSE boundary. It resolves the backend base URL (default `http://127.0.0.1:43121`, overridable in Settings → Backend connection) and owns request encoding, error conversion, manager-event parsing and validation, and the `EventSource` subscription while leaving native reconnection intact. A component does not communicate directly with the manager or a Pi process.
+`src/api.ts` is the frontend's only HTTP and SSE boundary. It resolves the backend base URL (default: same-origin Hermes plugin mount at `/api/plugins/hermes-pi-coding-ui-plugin`, overridable in Settings → Backend connection for direct loopback debugging) and owns request encoding, error conversion, manager-event parsing and validation, and the `EventSource` subscription while leaving native reconnection intact. A component does not communicate directly with the manager or a Pi process.
+
+`dashboard/plugin_api.py` registers a FastAPI router (via `dashboard/manifest.json` `"api"`) that reverse-proxies those requests to the loopback Pi backend. Hermes dashboard auth protects the mount; the Pi backend stays on `127.0.0.1`.
 
 All plugin CSS is scoped under `.app-shell` so injected styles do not repaint the Hermes dashboard chrome. `src/App.css` orders the stylesheets. Global and responsive rules live in `src/styles/`; feature-specific rules are colocated with their feature.
 
@@ -52,11 +57,12 @@ All plugin CSS is scoped under `.app-shell` so injected styles do not repaint th
 ## Main flows
 
 1. Hermes loads the plugin bundle and mounts `App`.
-2. The plugin calls a function from `src/api.ts` against the configured backend origin.
-3. `server/backend.ts` validates the request and handles local capabilities directly, or forwards it to the manager.
-4. The manager creates, reopens, or commands the relevant Pi process.
-5. Pi events travel back to the backend and then to the plugin through SSE.
-6. `App` updates cross-cutting state and delegates rendering to the relevant feature.
+2. The plugin calls a function from `src/api.ts` against the Hermes plugin proxy (or a configured direct backend URL).
+3. `dashboard/plugin_api.py` forwards the request to `server/backend.ts` on loopback.
+4. `server/backend.ts` validates the request and handles local capabilities directly, or forwards it to the manager.
+5. The manager creates, reopens, or commands the relevant Pi process.
+6. Pi events travel back through the proxy to the plugin through SSE.
+7. `App` updates cross-cutting state and delegates rendering to the relevant feature.
 
 ## Where to make a change
 

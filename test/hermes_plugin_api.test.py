@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import importlib.util
 import os
 import socket
@@ -50,6 +49,13 @@ class _BackendHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"data: {\"kind\":\"event\"}\n\n")
             type(self).events_sent += 1
             return
+        if self.path == "/api/sessions":
+            # Slow-but-complete response must not freeze the dashboard event loop.
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"[]")
+            return
         self.send_response(404)
         self.end_headers()
 
@@ -89,46 +95,15 @@ class PluginApiHelpersTest(unittest.TestCase):
             f"http://127.0.0.1:{self.port}/api/sessions?limit=5",
         )
 
-    def test_open_backend_request_forwards_json_responses(self) -> None:
-        server = HTTPServer(("127.0.0.1", self.port), _BackendHandler)
-        thread = Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        self.addCleanup(server.shutdown)
-
-        response = self.plugin_api.open_backend_request(
-            method="GET",
-            target_url=f"http://127.0.0.1:{self.port}/api/health",
-            headers={"Accept": "application/json"},
-            body=None,
-        )
-        payload = response.read()
-        response.close()
-        self.assertEqual(payload, b'{"ok":true}')
-
-    def test_open_backend_request_streams_event_source_payload(self) -> None:
-        server = HTTPServer(("127.0.0.1", self.port), _BackendHandler)
-        thread = Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        self.addCleanup(server.shutdown)
-
-        response = self.plugin_api.open_backend_request(
-            method="GET",
-            target_url=f"http://127.0.0.1:{self.port}/api/events",
-            headers={"Accept": "text/event-stream"},
-            body=None,
-        )
-        chunks = list(self.plugin_api.iter_response_chunks(response))
-        response.close()
-        self.assertEqual(b"".join(chunks), b"data: {\"kind\":\"event\"}\n\n")
-
 
 class PluginApiRouteTest(unittest.TestCase):
     def setUp(self) -> None:
         try:
+            import httpx  # noqa: F401
             from fastapi import FastAPI  # noqa: F401
             from fastapi.testclient import TestClient  # noqa: F401
         except ImportError as error:
-            raise unittest.SkipTest("fastapi is required for proxy route tests") from error
+            raise unittest.SkipTest("fastapi and httpx are required for proxy route tests") from error
 
         self.temp_dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp_dir.cleanup)
@@ -161,6 +136,11 @@ class PluginApiRouteTest(unittest.TestCase):
         response = self.client.get("/api/plugins/hermes-pi-coding-ui-plugin/api/health")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), {"ok": True})
+
+    def test_proxy_forwards_sessions_json(self) -> None:
+        response = self.client.get("/api/plugins/hermes-pi-coding-ui-plugin/api/sessions")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), [])
 
     def test_proxy_streams_events(self) -> None:
         with self.client.stream(

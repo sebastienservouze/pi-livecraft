@@ -1,14 +1,16 @@
-"""Reverse-proxy Pi Coding UI backend routes through the Hermes dashboard."""
+"""Reverse-proxy Pi Coding UI backend routes through the Hermes dashboard.
+
+All upstream I/O is async (httpx) so the Hermes dashboard event loop never
+blocks on Pi backend reads, including long-lived SSE streams.
+"""
 
 from __future__ import annotations
 
-import asyncio
 import os
-import urllib.error
-import urllib.request
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from typing import Final
 
+import httpx
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -24,9 +26,12 @@ HOP_BY_HOP_HEADERS: Final = frozenset(
         "trailers",
         "transfer-encoding",
         "upgrade",
+        "content-length",
+        "content-encoding",
     },
 )
-SSE_CHUNK_SIZE: Final = 8192
+# Fail fast when Pi is down; allow long reads for SSE.
+BACKEND_TIMEOUT: Final = httpx.Timeout(connect=3.0, read=None, write=30.0, pool=5.0)
 
 
 def backend_base_url() -> str:
@@ -60,37 +65,13 @@ def forward_request_headers(request: Request) -> dict[str, str]:
     return headers
 
 
-def response_header_items(response: urllib.response.addinfourl) -> list[tuple[str, str]]:
+def response_header_items(response: httpx.Response) -> list[tuple[str, str]]:
     items: list[tuple[str, str]] = []
-    for key, value in response.headers.items():
+    for key, value in response.headers.multi_items():
         if key.lower() in HOP_BY_HOP_HEADERS:
             continue
         items.append((key, value))
     return items
-
-
-def iter_response_chunks(response: urllib.response.addinfourl) -> Iterator[bytes]:
-    while True:
-        chunk = response.read(SSE_CHUNK_SIZE)
-        if not chunk:
-            break
-        yield chunk
-
-
-def open_backend_request(
-    *,
-    method: str,
-    target_url: str,
-    headers: dict[str, str],
-    body: bytes | None,
-) -> urllib.response.addinfourl:
-    request = urllib.request.Request(
-        target_url,
-        data=body,
-        headers=headers,
-        method=method,
-    )
-    return urllib.request.urlopen(request, timeout=300)
 
 
 def backend_unavailable_response() -> JSONResponse:
@@ -112,50 +93,53 @@ async def proxy_backend(path: str, request: Request) -> Response:
     body = await request.body()
     headers = forward_request_headers(request)
 
+    client = httpx.AsyncClient(timeout=BACKEND_TIMEOUT)
     try:
-        response = await asyncio.to_thread(
-            open_backend_request,
-            method=request.method,
-            target_url=target_url,
-            headers=headers,
-            body=body if body else None,
+        upstream = await client.send(
+            client.build_request(
+                request.method,
+                target_url,
+                headers=headers,
+                content=body if body else None,
+            ),
+            stream=True,
         )
-    except urllib.error.HTTPError as error:
-        payload = error.read()
-        return Response(
-            content=payload,
-            status_code=error.code,
-            headers={
-                key: value
-                for key, value in error.headers.items()
-                if key.lower() not in HOP_BY_HOP_HEADERS
-            },
-            media_type=error.headers.get_content_type(),
-        )
-    except urllib.error.URLError:
+    except (httpx.ConnectError, httpx.ConnectTimeout, httpx.NetworkError):
+        await client.aclose()
+        return backend_unavailable_response()
+    except httpx.HTTPError:
+        await client.aclose()
         return backend_unavailable_response()
 
-    content_type = response.headers.get_content_type()
-    if content_type == "text/event-stream":
+    content_type = upstream.headers.get("content-type", "")
+    media_type = content_type.split(";")[0].strip() or None
+    response_headers = dict(response_header_items(upstream))
+
+    if media_type == "text/event-stream":
         async def stream_events() -> AsyncIterator[bytes]:
             try:
-                for chunk in iter_response_chunks(response):
+                async for chunk in upstream.aiter_bytes():
                     yield chunk
             finally:
-                response.close()
+                await upstream.aclose()
+                await client.aclose()
 
         return StreamingResponse(
             stream_events(),
-            status_code=response.status,
-            headers=dict(response_header_items(response)),
-            media_type=content_type,
+            status_code=upstream.status_code,
+            headers=response_headers,
+            media_type=media_type,
         )
 
-    payload = response.read()
-    response.close()
+    try:
+        payload = await upstream.aread()
+    finally:
+        await upstream.aclose()
+        await client.aclose()
+
     return Response(
         content=payload,
-        status_code=response.status,
-        headers=dict(response_header_items(response)),
-        media_type=content_type,
+        status_code=upstream.status_code,
+        headers=response_headers,
+        media_type=media_type,
     )

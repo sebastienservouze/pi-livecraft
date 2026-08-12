@@ -49,7 +49,6 @@ test('les nouvelles commandes de productivité sont reconnues par le registre', 
     'next-session',
     'previous-session',
     'toggle-conversation-view',
-    'open-explorer',
   ]
   for (const id of ids) {
     const definition = commandDefinitions.find((d) => d.id === id)
@@ -65,7 +64,8 @@ test('les nouveaux raccourcis par défaut sont définis', () => {
   assert.equal(defaultShortcuts['next-session'], 'alt+arrowright')
   assert.equal(defaultShortcuts['previous-session'], 'alt+arrowleft')
   assert.equal(defaultShortcuts['toggle-conversation-view'], undefined)
-  assert.equal(defaultShortcuts['open-explorer'], 'alt+o')
+  assert.equal(defaultShortcuts['open-widget-explorer'], 'alt+o')
+  assert.equal(defaultShortcuts['open-widget-shell'], 'alt+t')
 })
 
 test('extrait la dernière réponse assistant', () => {

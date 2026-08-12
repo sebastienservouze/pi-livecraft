@@ -132,7 +132,7 @@ Pi RPC integration tests require a configured `pi` installation.
 
 - **`pi: command not found`** — install Pi globally; on Windows, `where.exe pi.cmd` must succeed.
 - **Backend unavailable** — on the server running Hermes, confirm `hermes pi-coding-ui status` and ports `43120`/`43121`; after a manager crash, restart with `hermes pi-coding-ui start`.
-- **Open Folder / Open Terminal hit the wrong machine** — the Pi backend must run on the Hermes server, not your laptop. The tab defaults to the Hermes plugin proxy; remove any custom Backend URL pointing at local `127.0.0.1`.
+- **Files or Terminal panel shows the wrong machine** — both panels act on the host running the Pi backend. The tab defaults to the Hermes plugin proxy; remove any custom Backend URL pointing at your laptop's `127.0.0.1`.
 - **Plugin tab missing** — run `hermes plugins list`, confirm the plugin is enabled, then rescan: `curl http://127.0.0.1:9119/api/dashboard/plugins/rescan`.
 - **CORS errors** — the backend listens on `127.0.0.1` and mirrors the browser `Origin` by default. If you set `PI_LIVECRAFT_CORS_ORIGIN`, it becomes a strict allowlist (plus loopback); include your Hermes dashboard origin there.
 

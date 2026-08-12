@@ -80,6 +80,35 @@ export interface WorkspaceFile {
   content: string
 }
 
+export interface WorkspaceEntry {
+  name: string
+  relativePath: string
+  kind: 'file' | 'directory'
+  size: number | null
+  modifiedMs: number | null
+}
+
+export interface WorkspaceEntries {
+  /** Absolute path of the listed directory. */
+  path: string
+  /** Path relative to the workspace root; empty at the root itself. */
+  relativePath: string
+  /** Relative parent, or null when the listed directory is the workspace root. */
+  parentRelativePath: string | null
+  entries: WorkspaceEntry[]
+}
+
+export interface ShellSessionInfo {
+  id: string
+  cwd: string
+  shell: string
+}
+
+export interface ShellOutputChunk {
+  chunk: string
+  exited?: boolean
+}
+
 export interface TodoSessionLink {
   id: string
   name: string

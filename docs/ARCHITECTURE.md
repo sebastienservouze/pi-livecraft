@@ -42,7 +42,7 @@ All plugin CSS is scoped under `.app-shell` so injected styles do not repaint th
 
 ## Backend and manager
 
-`server/backend.ts` exposes the web API, validates HTTP requests, enables CORS for the Hermes dashboard origin, and broadcasts SSE events. It no longer serves a standalone SPA build. Domain behavior for Git, quotas, terminal launching, and todos lives in `server/features/`; route definitions remain in the backend. Other neighboring modules provide workspace files, recent sessions, and system integrations.
+`server/backend.ts` exposes the web API, validates HTTP requests, enables CORS for the Hermes dashboard origin, and broadcasts SSE events. It no longer serves a standalone SPA build. Domain behavior for Git, quotas, workspace browsing, browser shells, and todos lives in `server/features/`; route definitions remain in the backend. Other neighboring modules provide workspace files, recent sessions, and system integrations.
 
 `server/manager.ts` is the sole owner of `pi --mode rpc` processes. `server/pi-process.ts` starts them with the extensions from `pi-extensions/`, while `server/manager-client.ts` carries backend requests over local JSON Lines. Keeping this ownership outside the backend preserves Pi sessions across backend restarts.
 

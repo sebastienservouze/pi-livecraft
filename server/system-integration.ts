@@ -29,11 +29,6 @@ export function getDesktopPlatform(
   return env.WSL_DISTRO_NAME || env.WSL_INTEROP ? 'wsl' : 'linux'
 }
 
-/** Returns the WSL distribution running the backend when its name is available. */
-export function getWslDistributionName(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.WSL_DISTRO_NAME || undefined
-}
-
 /**
  * Linux openers need a graphical session. Services without DISPLAY hang in
  * xdg-open/D-Bus instead of failing quickly on Raspberry Pi OS and other hosts.
@@ -41,7 +36,7 @@ export function getWslDistributionName(env: NodeJS.ProcessEnv = process.env): st
 export function requireLinuxGraphicalSession(env: NodeJS.ProcessEnv = process.env): void {
   if (env.DISPLAY || env.WAYLAND_DISPLAY) return
   throw new DesktopIntegrationError(
-    'No graphical display on this host (DISPLAY/WAYLAND_DISPLAY unset). Open Folder and Open Terminal launch apps on the server desktop, not in your browser. Run the Pi backend inside a desktop/VNC session or set DISPLAY for that service.',
+    'No graphical display on this host (DISPLAY/WAYLAND_DISPLAY unset). Opening a file starts an application on the backend desktop; use the Files panel to read it in the browser instead.',
   )
 }
 

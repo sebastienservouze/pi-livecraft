@@ -6,7 +6,6 @@ import {
   DesktopIntegrationError,
   externalWorkspacePath,
   getDesktopPlatform,
-  getWslDistributionName,
   linuxOpenInvocations,
   openPath,
   requireLinuxGraphicalSession,
@@ -17,11 +16,6 @@ test('detects Linux, macOS, and WSL from the runtime environment', () => {
   assert.equal(getDesktopPlatform('darwin', {}), 'macos')
   assert.equal(getDesktopPlatform('linux', { WSL_DISTRO_NAME: 'Ubuntu' }), 'wsl')
   assert.equal(getDesktopPlatform('win32', {}), 'windows')
-})
-
-test('reads the current WSL distribution name when available', () => {
-  assert.equal(getWslDistributionName({ WSL_DISTRO_NAME: 'Ubuntu-22.04' }), 'Ubuntu-22.04')
-  assert.equal(getWslDistributionName({ WSL_INTEROP: '/run/WSL/1_interop' }), undefined)
 })
 
 test('keeps Linux, macOS, and native Windows workspace paths unchanged', async () => {

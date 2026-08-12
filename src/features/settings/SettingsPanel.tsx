@@ -19,7 +19,7 @@ const themeVariableLabels: Record<ThemeVariable, string> = {
 // ── Tab registry ───────────────────────────────────────────────────
 
 /** Identifies a settings tab. Extend this union when adding a new tab. */
-export type SettingsTabId = 'themes' | 'terminal' | 'shortcuts' | 'backend'
+export type SettingsTabId = 'themes' | 'shortcuts' | 'backend'
 
 /** Describes one tab in the settings modal. */
 export interface SettingsTabDefinition {
@@ -31,7 +31,6 @@ export interface SettingsTabDefinition {
 export const settingsTabs: SettingsTabDefinition[] = [
   { id: 'themes', label: 'Color themes' },
   { id: 'backend', label: 'Backend connection' },
-  { id: 'terminal', label: 'Terminal' },
   { id: 'shortcuts', label: 'Shortcuts' },
 ]
 
@@ -41,14 +40,12 @@ interface SettingsPanelProps {
   backendBaseUrl: string
   definitions: CommandDefinition[]
   shortcuts: Partial<Record<CommandId, string>>
-  terminalCommand: string
   themes: Theme[]
   activeThemeId: string
   onBackendBaseUrlChange: (value: string) => void
   onBackendBaseUrlReset: () => void
   onPreviewTheme: (theme: Theme | undefined) => void
   onChange: (id: CommandId, shortcut: string) => void
-  onTerminalCommandChange: (value: string) => void
   onSelectTheme: (id: string) => void
   onDuplicateTheme: () => void
   onRenameTheme: (id: string, name: string) => void
@@ -245,7 +242,7 @@ function BackendSettings({ backendBaseUrl, onChange, onReset }: BackendSettingsP
         <code>{HERMES_PLUGIN_BACKEND_PATH}</code>. Start that backend on the server with{' '}
         <code>hermes pi-coding-ui start</code>.
       </p>
-      <label className='terminal-command-row'>
+      <label className='settings-field-row'>
         <span>Backend base URL</span>
         <input
           aria-label='Backend base URL'
@@ -254,7 +251,7 @@ function BackendSettings({ backendBaseUrl, onChange, onReset }: BackendSettingsP
           spellCheck={false}
           value={draft}
         />
-        {error && <small className='terminal-command-error'>{error}</small>}
+        {error && <small className='settings-field-error'>{error}</small>}
         <small>
           Use the Hermes plugin mount or a direct loopback URL such as{' '}
           <code>http://127.0.0.1:43121</code>{' '}
@@ -280,42 +277,6 @@ function BackendSettings({ backendBaseUrl, onChange, onReset }: BackendSettingsP
           Use default
         </button>
       </div>
-    </section>
-  )
-}
-
-interface TerminalSettingsProps {
-  terminalCommand: string
-  onTerminalCommandChange: (value: string) => void
-}
-
-function TerminalSettings({ terminalCommand, onTerminalCommandChange }: TerminalSettingsProps) {
-  return (
-    <section>
-      <p>
-        When Pi Coding UI runs inside the Hermes dashboard, <strong>Open terminal</strong>{' '}
-        opens Hermes Chat and <strong>Open folder</strong>{' '}
-        opens Hermes Files in the browser. The command below is only used for a direct local backend
-        that launches an OS terminal on the host.
-      </p>
-      <label className='terminal-command-row'>
-        <span>External terminal command</span>
-        <input
-          aria-label='Terminal command template'
-          onChange={(event) => onTerminalCommandChange(event.target.value)}
-          placeholder='Platform default'
-          spellCheck={false}
-          value={terminalCommand}
-        />
-        {terminalCommand && !terminalCommand.includes('{cwd}') && (
-          <small className='terminal-command-error'>
-            The template must contain {'{cwd}'} where the workspace folder should be inserted.
-          </small>
-        )}
-        <small>
-          Leave empty for the platform default, or use {'{cwd}'} for the workspace folder.
-        </small>
-      </label>
     </section>
   )
 }
@@ -381,19 +342,17 @@ function ShortcutsSettings(
 
 // ── Main panel ─────────────────────────────────────────────────────
 
-/** Configures local shortcuts, terminal behavior, and editable color themes. */
+/** Configures the backend connection, local shortcuts, and editable color themes. */
 export function SettingsPanel({
   backendBaseUrl,
   definitions,
   shortcuts,
-  terminalCommand,
   themes,
   activeThemeId,
   onBackendBaseUrlChange,
   onBackendBaseUrlReset,
   onPreviewTheme,
   onChange,
-  onTerminalCommandChange,
   onSelectTheme,
   onDuplicateTheme,
   onRenameTheme,
@@ -474,18 +433,6 @@ export function SettingsPanel({
                 backendBaseUrl={backendBaseUrl}
                 onChange={onBackendBaseUrlChange}
                 onReset={onBackendBaseUrlReset}
-              />
-            </TabPanel>
-          )}
-          {activeTab === 'terminal' && (
-            <TabPanel
-              key='terminal'
-              id='settings-tab-terminal'
-              labelledBy='settings-tab-btn-terminal'
-            >
-              <TerminalSettings
-                onTerminalCommandChange={onTerminalCommandChange}
-                terminalCommand={terminalCommand}
               />
             </TabPanel>
           )}

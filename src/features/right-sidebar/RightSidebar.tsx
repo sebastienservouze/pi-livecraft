@@ -3,7 +3,6 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type ReactNode,
 } from 'react'
 import { Tooltip } from '../../components/Tooltip.tsx'
 import type {
@@ -15,6 +14,7 @@ import type {
   QuotaSnapshot,
   SessionSummary,
 } from '../../../shared/types.ts'
+import { ExplorerPanel } from '../explorer/ExplorerPanel.tsx'
 import { GitWidget } from '../git/GitWidget.tsx'
 import { QuotaWidget } from '../quotas/QuotaWidget.tsx'
 import { railQuota, type QuotaProvider } from '../quotas/quota-display.ts'
@@ -23,18 +23,11 @@ import type {
   SessionAnalysis,
   SessionAnalysisTarget,
 } from '../session-analysis/session-analysis.ts'
+import { ShellPanel } from '../shell/ShellPanel.tsx'
 import { TodoWidget } from '../todo/TodoWidget.tsx'
 import { loadTodos } from '../todo/todo-cache.ts'
 import { maxRightSidebarWidth, minRightSidebarWidth, type RightWidget } from './right-sidebar.ts'
 import { WidgetLayout } from './WidgetLayout.tsx'
-
-export interface RailAction {
-  key: string
-  icon: ReactNode
-  label: string
-  disabled?: boolean
-  onClick: () => void
-}
 
 /** Coordinates the sidebar panels, their common rail, and resizing. */
 export function RightSidebar({
@@ -51,10 +44,10 @@ export function RightSidebar({
   quotas,
   width,
   workspacePath,
-  railActions,
   onCommit,
   onDiscard,
   onFileSelect,
+  onPanelError,
   onPush,
   onQuotaRefresh,
   onRefresh,
@@ -79,10 +72,10 @@ export function RightSidebar({
   quotas: QuotaSnapshot | null
   width: number
   workspacePath: string
-  railActions: RailAction[]
   onCommit: (message: string) => Promise<void>
   onDiscard: (path?: string) => Promise<void>
   onFileSelect: (path: string, commitHash?: string) => Promise<GitFileDiff>
+  onPanelError: (message: string) => void
   onPush: () => Promise<GitPushResult>
   onQuotaRefresh: () => Promise<void>
   onRefresh: () => Promise<void>
@@ -213,8 +206,14 @@ export function RightSidebar({
                 snapshot={snapshot}
               />
             )}
+            {activeWidget === 'explorer' && (
+              <ExplorerPanel onError={onPanelError} workspacePath={workspacePath} />
+            )}
             {activeWidget === 'quotas' && (
               <QuotaWidget onRefresh={onQuotaRefresh} quotas={quotas} />
+            )}
+            {activeWidget === 'shell' && (
+              <ShellPanel onError={onPanelError} workspacePath={workspacePath} />
             )}
             {activeWidget === 'todo' && (
               <TodoWidget
@@ -269,6 +268,32 @@ export function RightSidebar({
             </button>
           </Tooltip>
         )}
+        <Tooltip label='Files'>
+          <button
+            aria-controls={activeWidget === 'explorer' ? 'explorer-panel' : undefined}
+            aria-expanded={activeWidget === 'explorer'}
+            aria-label={activeWidget === 'explorer'
+              ? 'Collapse the file browser'
+              : 'Expand the file browser'}
+            className='rail-tab'
+            onClick={() => onWidgetSelect('explorer')}
+            type='button'
+          >
+            <span aria-hidden='true'>🗀</span>
+          </button>
+        </Tooltip>
+        <Tooltip label='Terminal'>
+          <button
+            aria-controls={activeWidget === 'shell' ? 'shell-panel' : undefined}
+            aria-expanded={activeWidget === 'shell'}
+            aria-label={activeWidget === 'shell' ? 'Collapse the terminal' : 'Expand the terminal'}
+            className='rail-tab'
+            onClick={() => onWidgetSelect('shell')}
+            type='button'
+          >
+            <span aria-hidden='true'>❯_</span>
+          </button>
+        </Tooltip>
         <Tooltip label={quotaSummary?.label ?? 'Quotas'}>
           <button
             aria-controls={activeWidget === 'quotas' ? 'quotas-panel' : undefined}
@@ -303,19 +328,6 @@ export function RightSidebar({
             )}
           </button>
         </Tooltip>
-        {railActions.map((action) => (
-          <Tooltip key={action.key} label={action.label}>
-            <button
-              aria-label={action.label}
-              className='rail-tab'
-              disabled={action.disabled}
-              onClick={action.onClick}
-              type='button'
-            >
-              {action.icon}
-            </button>
-          </Tooltip>
-        ))}
       </div>
     </aside>
   )
@@ -324,6 +336,10 @@ export function RightSidebar({
 function panelLabel(activeWidget: RightWidget | null): string {
   return activeWidget === 'analysis'
     ? 'Session analysis'
+    : activeWidget === 'explorer'
+    ? 'Workspace files'
+    : activeWidget === 'shell'
+    ? 'Workspace terminal'
     : activeWidget === 'todo'
     ? 'Workspace tasks'
     : activeWidget === 'quotas'

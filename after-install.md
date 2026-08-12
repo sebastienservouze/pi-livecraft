@@ -47,7 +47,7 @@ Restart `hermes dashboard` after upgrades so `dashboard/plugin_api.py` is loaded
 
 ### Remote access
 
-When you open Hermes from another machine, the Pi Coding UI still uses the **server's** workspaces, tools, Git state, and terminal. Open Folder and Open Terminal act on the server OS.
+When you open Hermes from another machine, the Pi Coding UI still uses the **server's** workspaces, tools, and Git state. The **Files** and **Terminal** panels browse and run on the server, inside the browser tab, so the server needs no desktop session.
 
 If the tab fails remotely, check `hermes pi-coding-ui status` on the server — not on your laptop.
 

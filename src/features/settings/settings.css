@@ -196,17 +196,17 @@
   background: var(--accent);
   color: var(--surface);
 }
-.terminal-command-row {
+.settings-field-row {
   display: block;
   margin-bottom: 20px;
 }
-.terminal-command-row > span {
+.settings-field-row > span {
   display: block;
   margin-bottom: 6px;
   font-size: 13px;
   color: var(--ink);
 }
-.terminal-command-row input {
+.settings-field-row input {
   width: 100%;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
@@ -216,18 +216,18 @@
   font: 12px ui-monospace, monospace;
   outline: 0;
 }
-.terminal-command-row input:focus {
+.settings-field-row input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 13%, transparent);
 }
-.terminal-command-row small {
+.settings-field-row small {
   display: block;
   margin-top: 6px;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
 }
-.terminal-command-error {
+.settings-field-error {
   color: var(--danger) !important;
 }
 .theme-settings > p {

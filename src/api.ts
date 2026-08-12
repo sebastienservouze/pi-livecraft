@@ -12,7 +12,10 @@ import type {
   RecentSession,
   SessionSnapshot,
   SessionSummary,
+  ShellOutputChunk,
+  ShellSessionInfo,
   TodoItem,
+  WorkspaceEntries,
   WorkspaceFile,
 } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
@@ -87,11 +90,10 @@ export async function listDirectories(path: string): Promise<DirectoryListing> {
   return request<DirectoryListing>(`/api/directories?path=${encodeURIComponent(path)}`)
 }
 
-export async function openExplorer(cwd: string): Promise<void> {
-  await request<void>('/api/explorer', {
-    method: 'POST',
-    body: JSON.stringify({ cwd }),
-  })
+export async function listWorkspaceEntries(cwd: string, path = ''): Promise<WorkspaceEntries> {
+  return request<WorkspaceEntries>(
+    `/api/workspace/entries?cwd=${encodeURIComponent(cwd)}&path=${encodeURIComponent(path)}`,
+  )
 }
 
 export async function getGitSnapshot(cwd: string): Promise<GitSnapshot> {
@@ -142,11 +144,51 @@ export async function updateTodos(cwd: string, todos: TodoItem[]): Promise<TodoI
   })
 }
 
-export async function openTerminal(cwd: string, template: string): Promise<void> {
-  await request<void>('/api/terminal', {
+export async function createShellSession(cwd: string): Promise<ShellSessionInfo> {
+  return request<ShellSessionInfo>('/api/shell', {
     method: 'POST',
-    body: JSON.stringify({ cwd, template }),
+    body: JSON.stringify({ cwd }),
   })
+}
+
+export async function sendShellInput(id: string, data: string): Promise<void> {
+  await request<void>('/api/shell/input', {
+    method: 'POST',
+    body: JSON.stringify({ id, data }),
+  })
+}
+
+export async function closeShellSession(id: string): Promise<void> {
+  await request<void>('/api/shell/close', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  })
+}
+
+/** Parses one terminal output frame, ignoring anything that is not a shell chunk. */
+export function parseShellOutputChunk(data: string): ShellOutputChunk | null {
+  try {
+    const value: unknown = JSON.parse(data)
+    if (!isObject(value) || typeof value.chunk !== 'string') return null
+    return { chunk: value.chunk, exited: value.exited === true }
+  } catch {
+    return null
+  }
+}
+
+/** Streams one shell session's output, replaying its scrollback on connect. */
+export function subscribeShellOutput(
+  id: string,
+  onChunk: (chunk: ShellOutputChunk) => void,
+  onError: () => void,
+): () => void {
+  const source = new EventSource(apiUrl(`/api/shell/stream?id=${encodeURIComponent(id)}`))
+  source.onmessage = ({ data }) => {
+    const chunk = parseShellOutputChunk(data)
+    if (chunk) onChunk(chunk)
+  }
+  source.onerror = onError
+  return () => source.close()
 }
 
 export async function commitChanges(cwd: string, message: string): Promise<void> {

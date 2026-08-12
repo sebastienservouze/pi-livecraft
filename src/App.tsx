@@ -8,9 +8,7 @@ import {
   getGitSnapshot,
   getQuotas,
   improvePrompt,
-  openExplorer,
   openSession,
-  openTerminal,
   pushCommits,
   refreshQuotas,
   resetGitCommit,
@@ -20,10 +18,6 @@ import {
   sendPiCommand,
   subscribeManagerEvents,
 } from './api.ts'
-import {
-  openFolderAction,
-  openTerminalAction,
-} from './features/terminal/hermes-host-actions.ts'
 import { quotaRefreshAllowed } from '../shared/quota-refresh.ts'
 import type {
   GitSnapshot,
@@ -205,7 +199,6 @@ function App() {
     { id: number; target: SessionAnalysisTarget }
   >()
   const [shortcuts, setShortcuts] = useState(() => readShortcuts())
-  const [terminalCommand, setTerminalCommand] = useState(() => readTerminalCommand())
 
   // Workspace and session synchronization
   const selectedIdRef = useRef(window.localStorage.getItem('pi-livecraft.selected-session') ?? '')
@@ -883,12 +876,6 @@ function App() {
       setSettingsOpen(true)
       return
     }
-    if (id === 'open-terminal') {
-      void openTerminalAction(() => openTerminal(workspacePath, terminalCommand)).catch((cause) =>
-        showToast('error', messageOf(cause))
-      )
-      return
-    }
     if (id === 'new-session') {
       void startAndSelectSession(() => createSession(workspacePath)).catch((cause) =>
         showToast('error', messageOf(cause))
@@ -949,12 +936,6 @@ function App() {
       })
       return
     }
-    if (id === 'open-explorer') {
-      void openFolderAction(() => openExplorer(workspacePath)).catch((cause) =>
-        showToast('error', messageOf(cause))
-      )
-      return
-    }
   }, [
     gitSnapshot?.repository,
     openRightWidget,
@@ -969,7 +950,6 @@ function App() {
     showToast,
     snapshot.messages,
     startAndSelectSession,
-    terminalCommand,
     workspacePath,
   ])
 
@@ -1052,52 +1032,9 @@ function App() {
     setConversationNavigation((current) => ({ id: (current?.id ?? 0) + 1, target }))
   }, [])
 
-  // Right sidebar composition
-  /** Actions pinned to the right rail without an associated panel. */
-  const railActions = useMemo(() => [
-    {
-      key: 'explorer',
-      icon: (
-        <svg aria-hidden='true' viewBox='0 0 24 24' width='18' height='18'>
-          <path
-            d='M3 6.5A2.5 2.5 0 0 1 5.5 4h4l2 2h7A2.5 2.5 0 0 1 21 8.5v9A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z'
-            fill='none'
-            stroke='currentColor'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            strokeWidth='1.8'
-          />
-          <path
-            d='M3 9h18'
-            fill='none'
-            stroke='currentColor'
-            strokeLinecap='round'
-            strokeLinejoin='round'
-            strokeWidth='1.8'
-          />
-        </svg>
-      ),
-      label: 'Open folder',
-      onClick: () => {
-        void openFolderAction(() => openExplorer(workspacePath)).catch((cause) =>
-          showToast('error', messageOf(cause))
-        )
-      },
-    },
-    {
-      key: 'terminal',
-      icon: <span aria-hidden='true'>›_</span>,
-      label: 'Open terminal',
-      onClick: () => {
-        void openTerminalAction(() => openTerminal(workspacePath, terminalCommand)).catch((cause) =>
-          showToast('error', messageOf(cause))
-        )
-      },
-    },
-  ], [showToast, terminalCommand, workspacePath])
-
   // Application layout
   const rightPanelVisible = activeRightWidget === 'todo' || activeRightWidget === 'quotas'
+    || activeRightWidget === 'explorer' || activeRightWidget === 'shell'
     || (activeRightWidget === 'analysis' && sessionAnalysis !== null)
     || (activeRightWidget === 'git' && gitSnapshot?.repository === true)
 
@@ -1326,7 +1263,7 @@ function App() {
         quotas={quotas}
         width={rightSidebarWidth}
         workspacePath={workspacePath}
-        railActions={railActions}
+        onPanelError={(message) => showToast('error', message)}
         onCommit={async (message) => {
           await commitChanges(workspacePath, message)
         }}
@@ -1405,7 +1342,6 @@ function App() {
           backendBaseUrl={backendBaseUrl}
           definitions={commandDefinitions}
           shortcuts={shortcuts}
-          terminalCommand={terminalCommand}
           themes={allThemes(themePreferences)}
           activeThemeId={activeTheme.id}
           onBackendBaseUrlChange={(value) => {
@@ -1421,10 +1357,6 @@ function App() {
             const next = { ...shortcuts, [id]: shortcut }
             setShortcuts(next)
             window.localStorage.setItem('pi-livecraft.shortcuts', JSON.stringify(next))
-          }}
-          onTerminalCommandChange={(value) => {
-            setTerminalCommand(value)
-            window.localStorage.setItem('pi-livecraft.terminal-command', value)
           }}
           onSelectTheme={selectTheme}
           onDuplicateTheme={duplicateActiveTheme}
@@ -1467,11 +1399,6 @@ function readShortcuts(): Partial<Record<CommandId, string>> {
   } catch {
     return defaultShortcuts
   }
-}
-
-function readTerminalCommand(): string {
-  const stored = window.localStorage.getItem('pi-livecraft.terminal-command')
-  return stored && stored.trim() && stored.includes('{cwd}') ? stored : ''
 }
 
 /** Restores the last-selected right sidebar widget, falling back to git when not collapsed. */

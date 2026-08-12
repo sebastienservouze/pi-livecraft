@@ -19,7 +19,7 @@ Start with the area that owns the behavior. Read `App.tsx` only when state coord
 
 ## Workspace widgets
 
-- `git/`, `quotas/`, `session-analysis/`, `terminal/`, and `todo/` each keep their rendering and local state within their directory.
+- `explorer/`, `git/`, `quotas/`, `session-analysis/`, `shell/`, and `todo/` each keep their rendering and local state within their directory.
 - Their README files name the data owner, invariants, backend counterpart when one exists, and focused tests.
 
 Read the [project architecture](/docs/ARCHITECTURE.md) only when a change crosses the frontend, HTTP API, manager, or Pi process boundaries.

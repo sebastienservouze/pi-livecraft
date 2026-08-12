@@ -2,9 +2,10 @@
 
 This directory contains local product capabilities used by `server/backend.ts`. The backend remains the sole HTTP routing and validation boundary; feature modules implement behavior and persistence without defining routes.
 
+- [`explorer/`](/server/features/explorer/README.md) lists workspace directories for the in-app file browser.
 - [`git/`](/server/features/git/README.md) reads and mutates the selected repository.
 - [`quotas/`](/server/features/quotas/README.md) caches provider reports and coordinates refreshes through the manager.
-- [`terminal/`](/server/features/terminal/README.md) launches an external terminal application in the workspace directory.
+- [`shell/`](/server/features/shell/README.md) runs the shells streamed to the in-app terminal.
 - [`todos/`](/server/features/todos/README.md) persists workspace task lists.
 
 These modules do not own Pi processes. All Pi commands continue through `server/manager-client.ts` to `server/manager.ts`.

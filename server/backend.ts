@@ -17,8 +17,19 @@ import {
   resetGitCommit,
   revertGitCommit,
 } from './features/git/git.ts'
+import {
+  listWorkspaceEntries,
+  WorkspaceEntriesError,
+} from './features/explorer/workspace-entries.ts'
 import { QuotaService } from './features/quotas/quota-service.ts'
-import { openTerminalApplication, TerminalTemplateError } from './features/terminal/launcher.ts'
+import {
+  closeShellSession,
+  createShellSession,
+  shellSessionExists,
+  ShellSessionError,
+  subscribeShellOutput,
+  writeShellInput,
+} from './features/shell/shell-sessions.ts'
 import {
   loadWorkspaceTodos,
   parseTodoItems,
@@ -184,11 +195,14 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return
   }
 
-  if (method === 'POST' && url.pathname === '/api/explorer') {
-    const body = await readJsonBody(request)
-    if (typeof body.cwd !== 'string') throw new HttpError(400, 'Working directory is required')
-    await openPath(await resolveWorkingDirectory(body.cwd))
-    sendJson(response, 200, {})
+  if (method === 'GET' && url.pathname === '/api/workspace/entries') {
+    const cwd = await resolveWorkingDirectory(url.searchParams.get('cwd') ?? '~/.pi')
+    try {
+      sendJson(response, 200, await listWorkspaceEntries(cwd, url.searchParams.get('path') ?? ''))
+    } catch (error) {
+      if (error instanceof WorkspaceEntriesError) throw new HttpError(error.status, error.message)
+      throw error
+    }
     return
   }
 
@@ -267,21 +281,51 @@ async function route(request: IncomingMessage, response: ServerResponse): Promis
     return
   }
 
-  if (method === 'POST' && url.pathname === '/api/terminal') {
+  if (method === 'POST' && url.pathname === '/api/shell') {
     const body = await readJsonBody(request)
     if (typeof body.cwd !== 'string') throw new HttpError(400, 'Working directory is required')
-    const template = typeof body.template === 'string' && body.template.trim()
-      ? body.template
-      : undefined
-    if (template !== undefined && template.length > 2000)
-      throw new HttpError(400, 'Terminal command template is too long')
-    try {
-      await openTerminalApplication(await resolveWorkingDirectory(body.cwd), template)
-      sendJson(response, 200, { ok: true })
-    } catch (error) {
-      if (error instanceof TerminalTemplateError) throw new HttpError(400, error.message)
-      throw error
-    }
+    const cwd = await resolveWorkingDirectory(body.cwd)
+    sendJson(response, 201, withShellErrors(() => createShellSession(cwd)))
+    return
+  }
+
+  if (method === 'GET' && url.pathname === '/api/shell/stream') {
+    const id = url.searchParams.get('id')
+    if (!id) throw new HttpError(400, 'Terminal session id is required')
+    // Unknown sessions must fail before the stream headers go out.
+    if (!shellSessionExists(id)) throw new HttpError(404, 'Unknown terminal session')
+    applyCorsHeaders(response, origin)
+    response.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    })
+    response.write('retry: 500\n\n')
+    const unsubscribe = subscribeShellOutput(
+      id,
+      (chunk) => response.write(`data: ${JSON.stringify(chunk)}\n\n`),
+    )
+    request.on('close', unsubscribe)
+    return
+  }
+
+  if (method === 'POST' && url.pathname === '/api/shell/input') {
+    const body = await readJsonBody(request)
+    if (typeof body.id !== 'string' || !body.id)
+      throw new HttpError(400, 'Terminal session id is required')
+    if (typeof body.data !== 'string') throw new HttpError(400, 'Terminal input is required')
+    const { id, data } = body
+    withShellErrors(() => writeShellInput(id, data))
+    sendJson(response, 200, { ok: true })
+    return
+  }
+
+  if (method === 'POST' && url.pathname === '/api/shell/close') {
+    const body = await readJsonBody(request)
+    if (typeof body.id !== 'string' || !body.id)
+      throw new HttpError(400, 'Terminal session id is required')
+    closeShellSession(body.id)
+    sendJson(response, 200, { ok: true })
     return
   }
 
@@ -529,6 +573,16 @@ async function resolveWorkingDirectory(input: string): Promise<string> {
   if (!(await stat(canonical)).isDirectory())
     throw new HttpError(400, 'Working directory must be a directory')
   return canonical
+}
+
+/** Keeps terminal session failures on the HTTP status the browser panel expects. */
+function withShellErrors<T>(operation: () => T): T {
+  try {
+    return operation()
+  } catch (error) {
+    if (error instanceof ShellSessionError) throw new HttpError(error.status, error.message)
+    throw error
+  }
 }
 
 /** Returns only accessible subdirectories, with a navigable parent for the picker. */

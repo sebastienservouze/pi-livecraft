@@ -1,0 +1,106 @@
+.shell-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+.shell-actions button {
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 3px 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font: 700 10px ui-monospace, monospace;
+  cursor: pointer;
+  transition: border-color 180ms ease, color 180ms ease;
+}
+.shell-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.shell-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.shell-output {
+  height: 100%;
+  overflow: auto;
+  padding: 10px 12px 12px;
+  background: var(--canvas);
+  scrollbar-gutter: stable;
+}
+.shell-output:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.shell-output pre {
+  margin: 0;
+  color: var(--ink);
+  font: 11.5px/1.45 ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.shell-output pre div {
+  min-height: 1.45em;
+}
+.shell-empty {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.shell-input {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+}
+.shell-input > span {
+  color: var(--accent);
+  font: 700 12px ui-monospace, monospace;
+}
+.shell-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: 11.5px ui-monospace, monospace;
+  outline: 0;
+}
+.shell-input input::placeholder {
+  color: var(--subtle);
+}
+.ansi-bold {
+  font-weight: 700;
+}
+.ansi-bright {
+  filter: brightness(1.25);
+}
+.ansi-black {
+  color: var(--subtle);
+}
+.ansi-red {
+  color: var(--danger);
+}
+.ansi-green {
+  color: var(--success, #3fa46a);
+}
+.ansi-yellow {
+  color: var(--warning, #b58900);
+}
+.ansi-blue {
+  color: var(--accent);
+}
+.ansi-magenta {
+  color: color-mix(in srgb, var(--accent) 60%, var(--danger));
+}
+.ansi-cyan {
+  color: color-mix(in srgb, var(--accent) 70%, var(--success, #3fa46a));
+}
+.ansi-white {
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-actions button {
+    transition: none;
+  }
+}

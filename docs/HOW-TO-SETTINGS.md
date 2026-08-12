@@ -8,11 +8,11 @@
 SettingsPanel (modal container, tab state)
   ├── Tab bar (role="tablist")
   │     ├── Tab button: Color themes
-  │     ├── Tab button: Terminal
+  │     ├── Tab button: Backend connection
   │     └── Tab button: Shortcuts
   └── Tab panels (role="tabpanel", one visible at a time)
         ├── ThemeSettings (section component)
-        ├── TerminalSettings (section component)
+        ├── BackendSettings (section component)
         └── ShortcutsSettings (section component)
 ```
 
@@ -23,7 +23,7 @@ SettingsPanel (modal container, tab state)
 | Tab ID | Label | Component | Props from `SettingsPanelProps` |
 |---|---|---|---|
 | `themes` | Color themes | `ThemeSettings` | `themes`, `activeThemeId`, `onSelectTheme`, `onDuplicateTheme`, `onRenameTheme`, `onUpdateThemeColor`, `onDeleteTheme`, `onResetTheme` |
-| `terminal` | Terminal | `TerminalSettings` | `terminalCommand`, `onTerminalCommandChange` |
+| `backend` | Backend connection | `BackendSettings` | `backendBaseUrl`, `onBackendBaseUrlChange`, `onBackendBaseUrlReset` |
 | `shortcuts` | Shortcuts | `ShortcutsSettings` | `definitions`, `shortcuts`, `onChange`, `onReset` |
 
 ## Add a new tab
@@ -33,7 +33,7 @@ SettingsPanel (modal container, tab state)
 Open `src/features/settings/SettingsPanel.tsx` and add your tab ID to the `SettingsTabId` union:
 
 ```ts
-export type SettingsTabId = 'themes' | 'terminal' | 'shortcuts' | 'my-feature'
+export type SettingsTabId = 'themes' | 'backend' | 'shortcuts' | 'my-feature'
 ```
 
 ### Step 2: Add the tab to the registry
@@ -43,7 +43,7 @@ Add an entry to the `settingsTabs` array in the same file:
 ```ts
 export const settingsTabs: SettingsTabDefinition[] = [
   { id: 'themes', label: 'Color themes' },
-  { id: 'terminal', label: 'Terminal' },
+  { id: 'backend', label: 'Backend connection' },
   { id: 'shortcuts', label: 'Shortcuts' },
   { id: 'my-feature', label: 'My Feature' },
 ]

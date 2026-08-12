@@ -91,6 +91,43 @@ test('uses the legacy tokenizer on macOS', () => {
   )
 })
 
+test('rejects Linux terminals without a graphical session', async () => {
+  await assert.rejects(
+    () =>
+      openTerminalApplication(
+        '/home/pi',
+        undefined,
+        'linux',
+        (() => {
+          throw new Error('should not spawn')
+        }) as never,
+        {},
+      ),
+    /DISPLAY\/WAYLAND_DISPLAY unset/,
+  )
+})
+
+test('tries lxterminal on Linux when x-terminal-emulator is missing', async () => {
+  const calls: string[] = []
+  await openTerminalApplication(
+    '/home/pi/project',
+    undefined,
+    'linux',
+    ((command: string) => {
+      calls.push(command)
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => undefined
+      queueMicrotask(() => {
+        if (command === 'lxterminal') child.emit('spawn')
+        else child.emit('error', new Error('missing'))
+      })
+      return child as never
+    }) as never,
+    { DISPLAY: ':0' },
+  )
+  assert.deepEqual(calls.slice(0, 2), ['x-terminal-emulator', 'lxterminal'])
+})
+
 test('uses Windows Terminal in a new native Windows window', () => {
   assert.deepEqual(defaultTerminalInvocation('C:\\hostile & ü', 'windows'), {
     command: 'wt.exe',

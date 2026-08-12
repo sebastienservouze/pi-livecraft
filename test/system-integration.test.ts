@@ -3,10 +3,13 @@ import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
 import {
+  DesktopIntegrationError,
   externalWorkspacePath,
   getDesktopPlatform,
   getWslDistributionName,
+  linuxOpenInvocations,
   openPath,
+  requireLinuxGraphicalSession,
 } from '../server/system-integration.ts'
 
 test('detects Linux, macOS, and WSL from the runtime environment', () => {
@@ -132,4 +135,57 @@ test('converts WSL workspace paths through the injected converter', async () => 
     return '\\\\wsl.localhost\\Ubuntu\\home\\user\\project'
   })
   assert.equal(converted, '\\\\wsl.localhost\\Ubuntu\\home\\user\\project')
+})
+
+test('rejects Linux openers without a graphical session', () => {
+  assert.throws(
+    () => requireLinuxGraphicalSession({}),
+    (error: unknown) =>
+      error instanceof DesktopIntegrationError
+      && /DISPLAY\/WAYLAND_DISPLAY unset/.test(error.message),
+  )
+})
+
+test('opens Linux paths through xdg-open when a display is available', async () => {
+  let call: { command: string; args: string[] } | undefined
+  await openPath(
+    '/home/pi/hostile & ü/workspace',
+    'linux',
+    ((command: string, args: string[]) => {
+      call = { command, args }
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => undefined
+      queueMicrotask(() => child.emit('spawn'))
+      return child as never
+    }) as never,
+    async () => ({ isDirectory: () => true }),
+    { DISPLAY: ':0' },
+  )
+  assert.equal(call?.command, 'xdg-open')
+  assert.deepEqual(call?.args, ['/home/pi/hostile & ü/workspace'])
+})
+
+test('falls back to pcmanfm when xdg-open is missing on Linux', async () => {
+  const calls: string[] = []
+  await openPath(
+    '/home/pi/project',
+    'linux',
+    ((command: string) => {
+      calls.push(command)
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => undefined
+      queueMicrotask(() => {
+        if (command === 'pcmanfm') child.emit('spawn')
+        else child.emit('error', new Error('missing'))
+      })
+      return child as never
+    }) as never,
+    async () => ({ isDirectory: () => true }),
+    { DISPLAY: ':0' },
+  )
+  assert.deepEqual(calls.slice(0, 3), ['xdg-open', 'gio', 'pcmanfm'])
+  assert.deepEqual(
+    linuxOpenInvocations('/tmp').map((item) => item.command),
+    ['xdg-open', 'gio', 'pcmanfm', 'thunar', 'nautilus'],
+  )
 })

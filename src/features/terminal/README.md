@@ -14,7 +14,7 @@ Launch errors appear as regular notifications.
 
 With no custom command, the backend chooses the platform launcher:
 
-- Linux uses `x-terminal-emulator` with the workspace as its working directory;
+- Linux tries `x-terminal-emulator`, then Raspberry Pi / desktop fallbacks (`lxterminal`, `gnome-terminal`, `xfce4-terminal`, `konsole`, `mate-terminal`, `xterm`) with the workspace as the working directory. A graphical session (`DISPLAY` or `WAYLAND_DISPLAY`) is required;
 - macOS opens Terminal.app at the workspace path via `open -a Terminal`;
 - WSL uses `wt.exe`, preserves the current distribution when available, and opens at the workspace path;
 - native Windows tries Windows Terminal, Alacritty, WezTerm, PowerShell 7, Windows PowerShell, then Command Prompt, stopping at the first launcher that starts successfully. Console-shell targets use the required built-in Windows PowerShell broker, hidden only while it starts the visible terminal.

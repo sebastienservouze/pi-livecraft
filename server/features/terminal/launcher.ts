@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import {
   getDesktopPlatform,
   getWslDistributionName,
+  requireLinuxGraphicalSession,
   type DesktopPlatform,
 } from '../../system-integration.ts'
 
@@ -179,8 +180,17 @@ function defaultTerminalInvocations(
       ],
     }]
   }
-  if (platform === 'linux')
-    return [{ command: 'x-terminal-emulator', args: [], cwd: workspacePath }]
+  if (platform === 'linux') {
+    return [
+      { command: 'x-terminal-emulator', args: [], cwd: workspacePath },
+      { command: 'lxterminal', args: [`--working-directory=${workspacePath}`] },
+      { command: 'gnome-terminal', args: [`--working-directory=${workspacePath}`] },
+      { command: 'xfce4-terminal', args: [`--working-directory=${workspacePath}`] },
+      { command: 'konsole', args: ['--workdir', workspacePath] },
+      { command: 'mate-terminal', args: [`--working-directory=${workspacePath}`] },
+      { command: 'xterm', args: [], cwd: workspacePath },
+    ]
+  }
   if (platform === 'macos')
     return [{ command: 'open', args: ['-a', 'Terminal', workspacePath] }]
   return [
@@ -222,14 +232,17 @@ export async function openTerminalApplication(
   template?: string | null,
   platform: DesktopPlatform = getDesktopPlatform(),
   spawnProcess: SpawnProcess = spawn,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<void> {
+  if (platform === 'linux') requireLinuxGraphicalSession(env)
+
   if (template && template.trim()) {
     const invocation = parseTerminalTemplate(template, workspacePath, platform)
     await spawnDetached(invocation, spawnProcess)
     return
   }
 
-  const candidates = defaultTerminalInvocations(workspacePath, platform, process.env)
+  const candidates = defaultTerminalInvocations(workspacePath, platform, env)
   let lastError: unknown
   for (const invocation of candidates) {
     try {
@@ -242,6 +255,8 @@ export async function openTerminalApplication(
   throw lastError instanceof Error ? lastError : new Error('No terminal application is available')
 }
 
+const spawnStartTimeoutMs = 5_000
+
 function spawnDetached(invocation: TerminalInvocation, spawnProcess: SpawnProcess): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawnProcess(invocation.command, invocation.args, {
@@ -252,7 +267,15 @@ function spawnDetached(invocation: TerminalInvocation, spawnProcess: SpawnProces
       shell: false,
       windowsHide: invocation.windowsHide ?? false,
     })
-    child.once('error', reject)
+    const timer = invocation.waitForExit
+      ? undefined
+      : setTimeout(() => {
+        reject(new Error(`${invocation.command} did not start within ${spawnStartTimeoutMs}ms`))
+      }, spawnStartTimeoutMs)
+    child.once('error', (error) => {
+      if (timer) clearTimeout(timer)
+      reject(error)
+    })
     if (invocation.waitForExit) {
       child.once('exit', (code) => {
         if (code === 0) resolve()
@@ -261,6 +284,7 @@ function spawnDetached(invocation: TerminalInvocation, spawnProcess: SpawnProces
       return
     }
     child.once('spawn', () => {
+      if (timer) clearTimeout(timer)
       child.unref()
       resolve()
     })

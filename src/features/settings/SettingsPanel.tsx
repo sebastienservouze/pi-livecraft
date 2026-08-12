@@ -292,6 +292,12 @@ interface TerminalSettingsProps {
 function TerminalSettings({ terminalCommand, onTerminalCommandChange }: TerminalSettingsProps) {
   return (
     <section>
+      <p>
+        When Pi Coding UI runs inside the Hermes dashboard, <strong>Open terminal</strong>{' '}
+        opens Hermes Chat and <strong>Open folder</strong>{' '}
+        opens Hermes Files in the browser. The command below is only used for a direct local backend
+        that launches an OS terminal on the host.
+      </p>
       <label className='terminal-command-row'>
         <span>External terminal command</span>
         <input

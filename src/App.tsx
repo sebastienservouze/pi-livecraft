@@ -20,6 +20,10 @@ import {
   sendPiCommand,
   subscribeManagerEvents,
 } from './api.ts'
+import {
+  openFolderAction,
+  openTerminalAction,
+} from './features/terminal/hermes-host-actions.ts'
 import { quotaRefreshAllowed } from '../shared/quota-refresh.ts'
 import type {
   GitSnapshot,
@@ -880,7 +884,7 @@ function App() {
       return
     }
     if (id === 'open-terminal') {
-      void openTerminal(workspacePath, terminalCommand).catch((cause) =>
+      void openTerminalAction(() => openTerminal(workspacePath, terminalCommand)).catch((cause) =>
         showToast('error', messageOf(cause))
       )
       return
@@ -946,7 +950,9 @@ function App() {
       return
     }
     if (id === 'open-explorer') {
-      void openExplorer(workspacePath).catch((cause) => showToast('error', messageOf(cause)))
+      void openFolderAction(() => openExplorer(workspacePath)).catch((cause) =>
+        showToast('error', messageOf(cause))
+      )
       return
     }
   }, [
@@ -1073,7 +1079,9 @@ function App() {
       ),
       label: 'Open folder',
       onClick: () => {
-        void openExplorer(workspacePath).catch((cause) => showToast('error', messageOf(cause)))
+        void openFolderAction(() => openExplorer(workspacePath)).catch((cause) =>
+          showToast('error', messageOf(cause))
+        )
       },
     },
     {
@@ -1081,7 +1089,7 @@ function App() {
       icon: <span aria-hidden='true'>›_</span>,
       label: 'Open terminal',
       onClick: () => {
-        void openTerminal(workspacePath, terminalCommand).catch((cause) =>
+        void openTerminalAction(() => openTerminal(workspacePath, terminalCommand)).catch((cause) =>
           showToast('error', messageOf(cause))
         )
       },

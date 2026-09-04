@@ -1,6 +1,35 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { reasoningTextForDisplay } from '../src/features/conversation/message-display.ts'
+import {
+  assistantErrorMessage,
+  isVisibleConversationMessage,
+  reasoningTextForDisplay,
+} from '../src/features/conversation/message-display.ts'
+
+test('makes an errored assistant turn visible and exposes its provider error', () => {
+  const message = {
+    role: 'assistant',
+    content: [],
+    stopReason: 'error',
+    errorMessage: 'OpenAI API error (400): unsupported reasoning effort',
+  }
+
+  assert.equal(isVisibleConversationMessage(message), true)
+  assert.equal(assistantErrorMessage(message), message.errorMessage)
+})
+
+test('does not treat arbitrary or successful assistant metadata as a visible error', () => {
+  assert.equal(assistantErrorMessage({ role: 'assistant', errorMessage: 'Oops' }), null)
+  assert.equal(
+    isVisibleConversationMessage({
+      role: 'assistant',
+      content: [],
+      stopReason: 'stop',
+      errorMessage: 'Oops',
+    }),
+    false,
+  )
+})
 
 test('removes standard CSI SGR truecolor styling and resets', () => {
   assert.equal(

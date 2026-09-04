@@ -47,6 +47,30 @@
 .message.assistant > .content {
   padding-right: 42px;
 }
+.message.assistant.error {
+  padding: 11px 13px;
+  border: 1px solid var(--danger);
+  border-radius: 9px;
+  background: var(--danger-soft);
+}
+.message.assistant.error > .content {
+  padding-right: 0;
+}
+.response-error {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.response-error strong {
+  display: block;
+  margin-bottom: 5px;
+}
+.response-error pre {
+  margin: 0;
+  color: var(--ink);
+  font: 11px/1.55 ui-monospace, monospace;
+  white-space: pre-wrap;
+}
 .custom-message {
   max-width: 760px;
   padding: 11px 13px;

@@ -15,7 +15,16 @@ export function isVisibleConversationMessage(message: JsonObject): boolean {
   const role = message.role
   if (role === 'custom') return message.display === true && typeof message.customType === 'string'
   return (role === 'user' || role === 'assistant' || role === 'system')
-    && hasVisibleContent(message.content ?? message.output)
+    && (hasVisibleContent(message.content ?? message.output)
+      || assistantErrorMessage(message) !== null)
+}
+
+/** Extracts the provider error stored by Pi on an assistant message that could not complete. */
+export function assistantErrorMessage(message: JsonObject): string | null {
+  return message.role === 'assistant' && message.stopReason === 'error'
+      && typeof message.errorMessage === 'string' && message.errorMessage.trim()
+    ? message.errorMessage
+    : null
 }
 
 /** Reports whether protocol content contains text, thinking, or a supported inline image. */

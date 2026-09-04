@@ -4,7 +4,11 @@ import { isObject } from '../../../shared/is-object.ts'
 import { CopyButton } from './CopyButton.tsx'
 import { ForkButton } from './ForkButton.tsx'
 import { Markdown } from './Markdown.tsx'
-import { hasVisibleContent, reasoningTextForDisplay } from './message-display.ts'
+import {
+  assistantErrorMessage,
+  hasVisibleContent,
+  reasoningTextForDisplay,
+} from './message-display.ts'
 import { formatTokens, formatTurnCost, type MessageUsage } from './message-usage.ts'
 
 /** Renders a visible protocol message with the default or custom presentation. */
@@ -33,12 +37,13 @@ const DefaultMessageCard = memo(
     const role = String(message.role)
     const timestamp = typeof message.timestamp === 'number' ? new Date(message.timestamp) : null
     const time = timestamp && !Number.isNaN(timestamp.getTime()) ? timestamp : null
-    const text = visibleText(message.content ?? message.output)
+    const error = assistantErrorMessage(message)
+    const text = visibleText(message.content ?? message.output) || error || ''
     const forkEntryId = role === 'user' && typeof message.forkEntryId === 'string'
       ? message.forkEntryId
       : undefined
     return (
-      <article className={`message ${role}`}>
+      <article className={`message ${role}${error ? ' error' : ''}`}>
         {(text || forkEntryId) && (
           <div className='conversation-actions message-actions'>
             {forkEntryId && <ForkButton entryId={forkEntryId} onError={onError} onFork={onFork} />}
@@ -46,7 +51,9 @@ const DefaultMessageCard = memo(
           </div>
         )}
         <div className='content'>
-          {renderContent(message.content ?? message.output, message.role, onError)}
+          {error
+            ? <ResponseError message={error} />
+            : renderContent(message.content ?? message.output, message.role, onError)}
         </div>
         {role === 'user' && time && (
           <time
@@ -60,6 +67,16 @@ const DefaultMessageCard = memo(
     )
   },
 )
+
+/** Makes a failed provider request visible instead of leaving an empty assistant turn. */
+function ResponseError({ message }: { message: string }) {
+  return (
+    <div className='response-error' role='alert'>
+      <strong>Response failed</strong>
+      <pre>{message}</pre>
+    </div>
+  )
+}
 
 /** Renders an unknown custom message without interpreting extension-specific details. */
 function DefaultCustomMessage({ message }: { message: JsonObject & { customType?: unknown } }) {

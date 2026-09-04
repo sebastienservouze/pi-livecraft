@@ -13,6 +13,7 @@ test('detects Linux and WSL from the runtime environment', () => {
   assert.equal(getDesktopPlatform('linux', {}), 'linux')
   assert.equal(getDesktopPlatform('linux', { WSL_DISTRO_NAME: 'Ubuntu' }), 'wsl')
   assert.equal(getDesktopPlatform('win32', {}), 'windows')
+  assert.equal(getDesktopPlatform('darwin', {}), 'macos')
 })
 
 test('reads the current WSL distribution name when available', () => {
@@ -20,9 +21,26 @@ test('reads the current WSL distribution name when available', () => {
   assert.equal(getWslDistributionName({ WSL_INTEROP: '/run/WSL/1_interop' }), undefined)
 })
 
-test('keeps Linux and native Windows workspace paths unchanged', async () => {
+test('keeps Linux, macOS, and native Windows workspace paths unchanged', async () => {
   assert.equal(await externalWorkspacePath('/home/user/project', 'linux'), '/home/user/project')
+  assert.equal(await externalWorkspacePath('/Users/ada/project', 'macos'), '/Users/ada/project')
   assert.equal(await externalWorkspacePath('C:\\Users\\Ada', 'windows'), 'C:\\Users\\Ada')
+})
+
+test('opens macOS paths with the system opener', async () => {
+  let call: { command: string; args: string[] } | undefined
+  await openPath(
+    '/Users/ada/project',
+    'macos',
+    ((command: string, args: string[]) => {
+      call = { command, args }
+      const child = new EventEmitter() as EventEmitter & { unref: () => void }
+      child.unref = () => undefined
+      queueMicrotask(() => child.emit('spawn'))
+      return child as never
+    }) as never,
+  )
+  assert.deepEqual(call, { command: 'open', args: ['/Users/ada/project'] })
 })
 
 test('opens Windows paths through a hidden PowerShell broker with a visible shell-associated process', async () => {

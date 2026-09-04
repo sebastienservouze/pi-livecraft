@@ -181,6 +181,8 @@ function defaultTerminalInvocations(
   }
   if (platform === 'linux')
     return [{ command: 'x-terminal-emulator', args: [], cwd: workspacePath }]
+  if (platform === 'macos')
+    return [{ command: 'open', args: ['-a', 'Terminal', workspacePath] }]
   return [
     { command: 'wt.exe', args: ['--window', 'new', '--startingDirectory', workspacePath] },
     { command: 'alacritty.exe', args: ['--working-directory', workspacePath] },

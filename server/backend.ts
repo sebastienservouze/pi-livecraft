@@ -40,7 +40,8 @@ import type {
 } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
 
-const host = '127.0.0.1'
+/** Listen address; defaults to loopback so the server stays local unless overridden. */
+const host = process.env.PI_LIVECRAFT_HOST ?? '127.0.0.1'
 const port = readPort('PI_LIVECRAFT_BACKEND_PORT', 43_121)
 const managerPort = readPort('PI_LIVECRAFT_MANAGER_PORT', 43_120)
 const manager = new ManagerClient(host, managerPort)

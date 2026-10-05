@@ -17,6 +17,12 @@ import type {
 } from '../shared/types.ts'
 import { isObject } from '../shared/is-object.ts'
 
+/**
+ * API prefix bound at build time from PI_LIVECRAFT_BASE_PATH (injected by
+ * Vite's define, see vite.config.ts)
+ */
+const apiBase = (globalThis as { __API_BASE__?: string }).__API_BASE__ ?? ''
+
 const managerEventNames: readonly ManagerEvent['event'][] = [
   'session_created',
   'session_exited',
@@ -51,7 +57,7 @@ export function subscribeManagerEvents(
   onEvent: (event: ManagerEvent) => void,
   onError: () => void,
 ): () => void {
-  const source = new EventSource('/api/events')
+  const source = new EventSource(apiBase + '/api/events')
   source.onmessage = ({ data }) => {
     const event = parseManagerEvent(data)
     if (event) onEvent(event)
@@ -283,7 +289,7 @@ export async function sendPiCommand(sessionId: string, command: JsonObject): Pro
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(apiBase + path, {
     ...init,
     headers: typeof init?.body === 'string'
       ? { 'Content-Type': 'application/json', ...init.headers }
